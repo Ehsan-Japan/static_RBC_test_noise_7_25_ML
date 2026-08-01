@@ -79,6 +79,8 @@ def parse_evaluation(path):
 records = []
 missing = []
 
+print(f"Reading samples from {os.path.abspath(DATA_DIR)}")
+
 for i in range(1, N_SAMPLES + 1):
     path = os.path.join(DATA_DIR, f"sample_{i}", "evaluation.txt")
     if not os.path.isfile(path):
@@ -92,7 +94,8 @@ for i in range(1, N_SAMPLES + 1):
 N = len(records)
 
 if N == 0:
-    raise SystemExit("No evaluation files found. Check DATA_DIR.")
+    raise SystemExit(f"No evaluation files found in "
+                     f"{os.path.abspath(DATA_DIR)}. Check DATA_DIR.")
 
 if missing:
     print(f"[INFO] Missing samples: {missing}\n")

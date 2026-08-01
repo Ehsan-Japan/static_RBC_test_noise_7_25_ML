@@ -98,13 +98,14 @@ def build_cached(sample_dirs: Sequence[str],
     path = os.path.join(
         cache_dir, f"{tag}_r{n_rays}_p{n_points}_{det}_{sig}.npz")
     if os.path.isfile(path) and not rebuild:
+        print(f"reusing cached {tag}: {os.path.abspath(path)}")
         d = np.load(path)
         return d["X"], d["Y"]
     print(f"building {tag}: {len(sample_dirs)} samples, "
           f"{n_rays} rays x {n_points} points ({det} peaks)")
     X, Y = build(sample_dirs, n_rays, n_points, detector=detector)
     np.savez_compressed(path, X=X, Y=Y)
-    print(f"  cached -> {path}   X{X.shape}, "
+    print(f"  cached -> {os.path.abspath(path)}   X{X.shape}, "
           f"{100 * X[:, 0].mean():.3f}% of pixels are peaks, "
           f"{100 * Y.mean():.2f}% are transition lines")
     return X, Y

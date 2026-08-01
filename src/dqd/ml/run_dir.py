@@ -49,7 +49,7 @@ def new_run(kind: str, settings: Optional[Dict] = None,
     with open(os.path.join(path, "config.json"), "w") as f:
         json.dump({"kind": kind, "created": stamp, **(settings or {})},
                   f, indent=2, default=str)
-    print(f"run folder: {path}")
+    print(f"run folder: {os.path.abspath(path)}")
     return path
 
 

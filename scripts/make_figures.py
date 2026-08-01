@@ -74,12 +74,12 @@ def _save(fig, name, fig_dir):
     path = os.path.join(fig_dir, name)
     fig.savefig(path, dpi=DPI, facecolor=SURFACE, bbox_inches="tight")
     plt.close(fig)
-    print(f"  wrote {path}")
+    print(f"  wrote {os.path.abspath(path)}")
 
 
 def _read_csv(path):
     if not os.path.isfile(path):
-        print(f"  [skip] {path} not found")
+        print(f"  [skip] {os.path.abspath(path)} not found")
         return None
     with open(path, newline="") as f:
         rows = [{k: float(v) if _num(v) else v for k, v in r.items()}
@@ -213,7 +213,7 @@ def fig_examples(test_dir, model_path, fig_dir, n_examples=3):
     R, P, thr = ck["n_rays"], ck["n_points"], ck["threshold"]
     samples = grid_dataset.find_samples([test_dir])[:n_examples]
     if not samples:
-        print(f"  [skip] no test devices in {test_dir}")
+        print(f"  [skip] no test devices in {os.path.abspath(test_dir)}")
         return
     X, Y = grid_dataset.build(samples, R, P, verbose=False)
     pred = grid_train.predict(net, X) > thr
@@ -294,7 +294,13 @@ def main():
     if os.path.basename(host) == "models":
         host = os.path.dirname(host)
     fig_dir = os.path.join(host, "figures")
-    print(f"figures -> {fig_dir}\n")
+    if budget_csv:
+        print(f"budget csv:    {os.path.abspath(budget_csv)}")
+    if size_csv:
+        print(f"data-size csv: {os.path.abspath(size_csv)}")
+    if model:
+        print(f"checkpoint:    {os.path.abspath(model)}")
+    print(f"figures -> {os.path.abspath(fig_dir)}\n")
 
     print("budget sweep figures:")
     rows = _read_csv(budget_csv) if budget_csv else None

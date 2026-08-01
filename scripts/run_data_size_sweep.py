@@ -53,7 +53,12 @@ def main():
     train_samples = grid_dataset.find_samples([TRAIN_DIR])
     test_samples = grid_dataset.find_samples([TEST_DIR])
     if not train_samples or not test_samples:
-        sys.exit("need usable samples in both folders\nrun generate_ml_data.py first")
+        sys.exit(f"need usable samples in both folders\n"
+                 f"  train: {os.path.abspath(TRAIN_DIR)}\n"
+                 f"  test:  {os.path.abspath(TEST_DIR)}\n"
+                 f"run generate_ml_data.py first")
+    print(f"train devices from {os.path.abspath(TRAIN_DIR)}")
+    print(f"test devices from  {os.path.abspath(TEST_DIR)}")
 
     cache = run_dir.SHARED_CACHE
     Xte, Yte = grid_dataset.build_cached(test_samples, N_RAYS, N_POINTS,
@@ -91,7 +96,8 @@ def main():
     print(f"{'devices':>8} {'F1@1':>7}")
     for r in rows:
         print(f"{r['n_train']:>8} {r['ml_f1@1']:>7.3f}")
-    print(f"\nwrote {out_csv}")
+    print(f"\nwrote {os.path.abspath(out_csv)}")
+    print(f"everything for this trial is in {os.path.abspath(out)}")
 
 
 if __name__ == "__main__":

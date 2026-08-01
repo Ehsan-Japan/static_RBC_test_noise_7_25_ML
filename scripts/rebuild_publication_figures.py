@@ -61,14 +61,15 @@ def rebuild_sample(sample_dir: str) -> bool:
     hp_json = os.path.join(sample_dir, "hyperparameters.json")
     for p in (gt, peaks_json, hp_json):
         if not os.path.isfile(p):
-            print(f"[skip] {sample_dir}: missing {os.path.basename(p)}")
+            print(f"[skip] {os.path.abspath(sample_dir)}: "
+                  f"missing {os.path.abspath(p)}")
             return False
 
     vs = json.load(open(hp_json))["voltage_sweep"]
     peaks_dict = {float(k): v for k, v in json.load(open(peaks_json)).items()}
     rays_dict = _load_rays(sample_dir, sorted(peaks_dict))
     if not rays_dict:
-        print(f"[skip] {sample_dir}: no ray arrays found")
+        print(f"[skip] {os.path.abspath(sample_dir)}: no ray arrays found")
         return False
 
     ray_kwargs = dict(
@@ -80,10 +81,11 @@ def rebuild_sample(sample_dir: str) -> bool:
         peaks_dict=peaks_dict,
     )
 
+    out_png = os.path.join(sample_dir, "summary_total_all_crosses.png")
     OverlayRenderer.visualize_grid_2d_with_rays(
-        output_file=os.path.join(sample_dir, "summary_total_all_crosses.png"),
-        **CROSS_KWARGS, **ray_kwargs,
+        output_file=out_png, **CROSS_KWARGS, **ray_kwargs,
     )
+    print(f"  wrote {os.path.abspath(out_png)}")
     return True
 
 
@@ -99,8 +101,9 @@ def _collect_samples(path: str):
 def main() -> None:
     target = sys.argv[1] if len(sys.argv) > 1 else "training_data"
     samples = _collect_samples(target)
+    print(f"Rebuilding under {os.path.abspath(target)}")
     if not samples:
-        print(f"No sample_* folders found under {target}")
+        print(f"No sample_* folders found under {os.path.abspath(target)}")
         return
     ok = sum(rebuild_sample(s) for s in samples)
     print(f"\nRebuilt {ok}/{len(samples)} samples.")

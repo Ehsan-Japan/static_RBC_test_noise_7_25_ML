@@ -65,7 +65,12 @@ def main():
     train_samples = grid_dataset.find_samples([TRAIN_DIR])
     test_samples = grid_dataset.find_samples([TEST_DIR])
     if not train_samples or not test_samples:
-        sys.exit("need usable samples in both folders\nrun generate_ml_data.py first")
+        sys.exit(f"need usable samples in both folders\n"
+                 f"  train: {os.path.abspath(TRAIN_DIR)}\n"
+                 f"  test:  {os.path.abspath(TEST_DIR)}\n"
+                 f"run generate_ml_data.py first")
+    print(f"train devices from {os.path.abspath(TRAIN_DIR)}")
+    print(f"test devices from  {os.path.abspath(TEST_DIR)}")
     print(f"{len(train_samples)} train devices, {len(test_samples)} test "
           f"devices, {len(RAYS) * len(POINTS)} cells")
 
@@ -82,10 +87,11 @@ def main():
                                                  cache_dir=cache, tag="test")
 
             net, thr = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
-            grid_train.save(net, thr,
-                            os.path.join(out, "models",
-                                         grid_train.checkpoint_name(R, P)),
-                            R, P, extra={"n_train": len(Xtr)})
+            ckpt = os.path.join(out, "models",
+                                grid_train.checkpoint_name(R, P))
+            grid_train.save(net, thr, ckpt, R, P,
+                            extra={"n_train": len(Xtr)})
+            print(f"  saved {os.path.abspath(ckpt)}")
 
             m = evaluate(grid_train.predict(net, Xte) > thr, Yte)
             h = score_hough(Xte, Yte)
@@ -117,7 +123,8 @@ def main():
         print(f"{r['n_rays']:>5} {r['n_points']:>7} "
               f"{100 * r['coverage']:>8.1f}% {r['ml_f1@1']:>7.3f} "
               f"{r['hough_f1@1']:>7.3f}")
-    print(f"\nwrote {out_csv}\neverything for this trial is in {out}")
+    print(f"\nwrote {os.path.abspath(out_csv)}"
+          f"\neverything for this trial is in {os.path.abspath(out)}")
 
 
 if __name__ == "__main__":

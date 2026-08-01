@@ -48,22 +48,29 @@ def main():
 
     # ══════════════════════════════════════════════════════════════════
 
-    if not os.path.isfile(MODEL_PATH):
-        sys.exit(f"no checkpoint at {MODEL_PATH}\nrun train_model.py first")
+    model_path = MODEL_PATH or run_dir.find_file(
+        os.path.join("models", "rays6_points100.pt"))
+    if not model_path or not os.path.isfile(model_path):
+        sys.exit(f"no checkpoint at {os.path.abspath(model_path or '')}\n"
+                 f"run train_model.py first")
+
+    out = run_dir.new_run("eval", {"test_dir": TEST_DIR,
+                                   "model_path": model_path})
 
     net, ck = grid_train.load(model_path)
     R, P, thr = ck["n_rays"], ck["n_points"], ck["threshold"]
-    print(f"{os.path.basename(model_path)}: {R} rays x {P} points, "
+    print(f"{os.path.abspath(model_path)}: {R} rays x {P} points, "
           f"threshold {thr}, trained on {ck.get('n_train', '?')} devices")
 
     samples = grid_dataset.find_samples([TEST_DIR])
     if not samples:
-        sys.exit(f"no usable samples in {TEST_DIR}")
+        sys.exit(f"no usable samples in {os.path.abspath(TEST_DIR)}")
+    print(f"test devices from {os.path.abspath(TEST_DIR)}")
     print(f"{len(samples)} test devices")
 
     X, Y = grid_dataset.build_cached(samples, R, P, tag="test",
                                      cache_dir=run_dir.SHARED_CACHE)
-    result = {"model": os.path.basename(model_path),
+    result = {"model": os.path.abspath(model_path),
               "n_rays": R, "n_points": P, "n_test": len(X), "threshold": thr,
               "coverage": float(X[:, 1].mean()),
               "peak_frac": float(X[:, 0].mean()),
@@ -78,7 +85,8 @@ def main():
     out_json = os.path.join(out, "results_eval.json")
     with open(out_json, "w") as f:
         json.dump(result, f, indent=2)
-    print(f"\nwrote {out}")
+    print(f"\nwrote {os.path.abspath(out_json)}")
+    print(f"everything for this trial is in {os.path.abspath(out)}")
 
 
 if __name__ == "__main__":

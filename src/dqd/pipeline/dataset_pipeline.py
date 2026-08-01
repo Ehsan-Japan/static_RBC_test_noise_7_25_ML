@@ -151,7 +151,8 @@ class DatasetPipeline:
             from ..ml.detector import MLRayDetector, DEFAULT_WEIGHTS
             weights = ml_weights or DEFAULT_WEIGHTS
             self.ml_detector = MLRayDetector(weights, threshold=ml_threshold)
-            print(f"[DatasetPipeline] learned peak detector: {weights}")
+            print("[DatasetPipeline] learned peak detector: "
+                  f"{os.path.abspath(weights)}")
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -167,11 +168,13 @@ class DatasetPipeline:
         )
         save_dir = os.path.join(self.base_save_dir, run_folder)
         os.makedirs(save_dir, exist_ok=True)
+        print(f"[DatasetPipeline] output folder: {os.path.abspath(save_dir)}")
         for i in range(1, self.n_samples + 1):
+            sample_dir = os.path.join(save_dir, f"sample_{i}")
             print(f"\n{'='*60}")
             print(f"  Sample {i} / {self.n_samples}")
+            print(f"  {os.path.abspath(sample_dir)}")
             print(f"{'='*60}")
-            sample_dir = os.path.join(save_dir, f"sample_{i}")
             os.makedirs(sample_dir, exist_ok=True)
             try:
                 self._run_sample(i, sample_dir)
@@ -469,7 +472,7 @@ class DatasetPipeline:
         out_path = os.path.join(sample_dir, "hyperparameters.json")
         with open(out_path, "w") as f:
             json.dump(payload, f, indent=4, default=str)
-        print(f"Hyperparameters saved: {out_path}")
+        print(f"Hyperparameters saved: {os.path.abspath(out_path)}")
 
     # ------------------------------------------------------------------
     # Per-peak processing

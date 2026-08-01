@@ -56,6 +56,8 @@ def parse_evaluation(path: str) -> dict:
 records = []
 missing = []
 
+print(f"Reading samples from {os.path.abspath(DATA_DIR)}")
+
 for i in range(1, N_SAMPLES + 1):
     path = os.path.join(DATA_DIR, f"sample_{i}", "evaluation.txt")
     if not os.path.isfile(path):
@@ -70,7 +72,8 @@ print(f"Loaded {len(records)} / {N_SAMPLES} samples"
       + (f"  (missing: {missing})" if missing else ""))
 
 if not records:
-    raise SystemExit("No data found — check DATA_DIR.")
+    raise SystemExit(f"No data found in {os.path.abspath(DATA_DIR)} "
+                     "— check DATA_DIR.")
 
 coverage = np.array([r["coverage"] for r in records])
 accuracy = np.array([r["accuracy"] for r in records])
@@ -116,4 +119,4 @@ ax.grid(True, alpha=0.3)
 out = os.path.join(OUTPUT_DIR, "accuracy_vs_coverage.png")
 plt.tight_layout()
 plt.savefig(out, dpi=300, bbox_inches="tight")
-print(f"\nSaved → {out}")
+print(f"\nSaved → {os.path.abspath(out)}")

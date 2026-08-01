@@ -27,6 +27,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from dqd.config import paths
 from dqd.ml import grid_dataset, grid_train, run_dir
 
 
@@ -36,7 +37,7 @@ def main():
     # ══════════════════════════════════════════════════════════════════
 
     # Which devices to train on — the folder generate_ml_data.py wrote.
-    TRAIN_DIR = os.path.join("..", "training_data", "ml_train_split_n2000_res100")
+    TRAIN_DIR = paths.training_data("ml_train_split_n2000_res100")
 
     # The measurement budget: how many rays, and how many points along each.
     # These two are what the whole study is about.
@@ -56,7 +57,9 @@ def main():
 
     samples = grid_dataset.find_samples([TRAIN_DIR])
     if not samples:
-        sys.exit(f"no usable samples in {TRAIN_DIR}\nrun generate_ml_data.py first")
+        sys.exit(f"no usable samples in {os.path.abspath(TRAIN_DIR)}\n"
+                 "run generate_ml_data.py first")
+    print(f"reading devices from {os.path.abspath(TRAIN_DIR)}")
     print(f"{len(samples)} training devices, {N_RAYS} rays x {N_POINTS} points")
 
     X, Y = grid_dataset.build_cached(samples, N_RAYS, N_POINTS,
@@ -67,7 +70,7 @@ def main():
     path = os.path.join(out, "models",
                         grid_train.checkpoint_name(N_RAYS, N_POINTS))
     grid_train.save(net, thr, path, N_RAYS, N_POINTS, extra={"n_train": len(X)})
-    print(f"\nsaved {path}   (threshold {thr})")
+    print(f"\nsaved {os.path.abspath(path)}   (threshold {thr})")
     print("now point MODEL_PATH in evaluate_model.py at that file and run it")
 
 

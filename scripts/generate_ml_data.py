@@ -36,6 +36,7 @@ matplotlib.use("Agg")
 
 from dqd.config.axis_labels import set_axis_labels
 from dqd.config.capacitance_config import CapacitanceConfig
+from dqd.config import paths
 from dqd.ml.train_test_config import describe, split_configs
 from dqd.simulation.dqd_simulator import DQDSimulator
 from dqd.simulation.matrix_generator import CapacitanceMatrixGenerator
@@ -49,8 +50,8 @@ from dqd.visualization.overlay import OverlayRenderer
 # How many devices to make.  Recovering lines from a few dozen peaks needs
 # on the order of a thousand training devices before the numbers mean
 # anything.  At ~0.7 s/device, 2000 + 500 is about half an hour.
-N_TRAIN = 2000
-N_TEST = 500
+N_TRAIN = 50
+N_TEST = 10
 
 # Stability-diagram side length in pixels.  Fixes the network's input size,
 # so every device in one study must share it.
@@ -73,8 +74,9 @@ TEMPERATURE = 0.00001
 # One reproducible random stream per split.  Same seed = same devices.
 SEED = 0
 
-# Where the device folders go.
-OUT_ROOT = os.path.join("..", "training_data")
+# Where the device folders go: <project>/training_data/, regardless of the
+# directory you start this from (dqd/config/paths.py).
+OUT_ROOT = paths.TRAINING_DATA
 
 # True keeps the per-device .jpg previews.  Off for a bulk run — it saves a
 # lot of disk, and nothing downstream reads them.
@@ -93,6 +95,7 @@ def generate(out_dir, n_devices, config, seed):
     set_axis_labels(x_name="P1", y_name="P2", x_unit="mV", y_unit="mV")
     gen = CapacitanceMatrixGenerator(seed=seed)      # one stream, reproducible
     os.makedirs(out_dir, exist_ok=True)
+    print(f"writing devices to {os.path.abspath(out_dir)}")
 
     t0, made = time.time(), 0
     for i in range(1, n_devices + 1):
@@ -149,7 +152,8 @@ def generate(out_dir, n_devices, config, seed):
             print(f"  {i}/{n_devices}  {rate:.2f}s/device  "
                   f"~{(n_devices - i) * rate / 60:.1f} min left")
 
-    print(f"{made} new devices in {out_dir}  ({time.time() - t0:.0f}s)\n")
+    print(f"{made} new devices in {os.path.abspath(out_dir)}  "
+          f"({time.time() - t0:.0f}s)\n")
 
 
 def _prune(device_dir, sim_dir):
