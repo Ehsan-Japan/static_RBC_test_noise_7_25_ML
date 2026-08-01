@@ -134,7 +134,9 @@ def fig_budget_rays(rows, fig_dir):
                     label=f"Hough baseline ({P} points/ray)")
 
     ax.set_ylim(0, 1)
-    ax.legend(frameon=False, fontsize=9, labelcolor=INK_2, loc="lower right")
+    # Upper left: the curves rise to the right, so a lower-right legend sits
+    # exactly where the interesting part of the data ends up.
+    ax.legend(frameon=False, fontsize=9, labelcolor=INK_2, loc="upper left")
     _save(fig, "fig_budget_rays.png", fig_dir)
 
 

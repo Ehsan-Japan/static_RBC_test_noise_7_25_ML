@@ -117,7 +117,7 @@ def main():
         print(f"{r['n_rays']:>5} {r['n_points']:>7} "
               f"{100 * r['coverage']:>8.1f}% {r['ml_f1@1']:>7.3f} "
               f"{r['hough_f1@1']:>7.3f}")
-    print(f"\nwrote {out_csv}   checkpoints in ../models/")
+    print(f"\nwrote {out_csv}\neverything for this trial is in {out}")
 
 
 if __name__ == "__main__":
