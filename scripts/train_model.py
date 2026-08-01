@@ -10,8 +10,11 @@ Edit the four settings below and run it:
 
     python train_model.py
 
-Writes one checkpoint per budget, e.g. models/rays6_points100.pt.  The
-checkpoint remembers the budget, so evaluate_model.py measures the test
+Every run creates its own folder, runs/<timestamp>_train/, holding the
+checkpoint and a config.json of the settings that produced it.  Nothing an
+earlier run made is ever overwritten.
+
+The checkpoint remembers its budget, so evaluate_model.py measures the test
 devices the same way and cannot mismatch them.
 
 Everything else — architecture, learning rate, batch size, validation
@@ -24,7 +27,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from dqd.ml import grid_dataset, grid_train
+from dqd.ml import grid_dataset, grid_train, run_dir
 
 
 def main():
@@ -48,17 +51,20 @@ def main():
 
     # ══════════════════════════════════════════════════════════════════
 
+    out = run_dir.new_run("train", {"train_dir": TRAIN_DIR, "n_rays": N_RAYS,
+                                    "n_points": N_POINTS, "epochs": EPOCHS})
+
     samples = grid_dataset.find_samples([TRAIN_DIR])
     if not samples:
         sys.exit(f"no usable samples in {TRAIN_DIR}\nrun generate_ml_data.py first")
     print(f"{len(samples)} training devices, {N_RAYS} rays x {N_POINTS} points")
 
     X, Y = grid_dataset.build_cached(samples, N_RAYS, N_POINTS,
-                                     cache_dir=os.path.join("..", "grid_cache"),
+                                     cache_dir=run_dir.SHARED_CACHE,
                                      tag="train")
     net, thr = grid_train.train(X, Y, epochs=EPOCHS)
 
-    path = os.path.join("..", "models",
+    path = os.path.join(out, "models",
                         grid_train.checkpoint_name(N_RAYS, N_POINTS))
     grid_train.save(net, thr, path, N_RAYS, N_POINTS, extra={"n_train": len(X)})
     print(f"\nsaved {path}   (threshold {thr})")

@@ -19,11 +19,14 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from dqd.ml import grid_dataset, grid_train
+from dqd.ml import grid_dataset, grid_train, run_dir
 from dqd.ml.grid_metrics import evaluate
 
 KEYS = ("f1@0", "f1@1", "f1@2", "f1@3", "iou")
 
+
+RUNSDIR = "C:/Users/ehsan/AppData/Local/Temp/claude/cfg2/runs"
+CACHE = "C:/Users/ehsan/AppData/Local/Temp/claude/cfg2/cache"
 
 def main():
     # ══════════════════════════════════════════════════════════════════
@@ -45,12 +48,17 @@ def main():
 
     # ══════════════════════════════════════════════════════════════════
 
+    out = run_dir.new_run("datasize", runs_root=RUNSDIR, settings={"train_dir": TRAIN_DIR,
+                                       "test_dir": TEST_DIR, "sizes": SIZES,
+                                       "n_rays": N_RAYS, "n_points": N_POINTS,
+                                       "epochs": EPOCHS})
+
     train_samples = grid_dataset.find_samples([TRAIN_DIR])
     test_samples = grid_dataset.find_samples([TEST_DIR])
     if not train_samples or not test_samples:
         sys.exit("need usable samples in both folders\nrun generate_ml_data.py first")
 
-    cache = os.path.join("C:/Users/ehsan/AppData/Local/Temp/claude/cfg2", "cache")
+    cache = CACHE
     Xte, Yte = grid_dataset.build_cached(test_samples, N_RAYS, N_POINTS,
                                          cache_dir=cache, tag="test")
 
@@ -59,7 +67,7 @@ def main():
         sizes.append(len(train_samples))       # always include "all of them"
     print(f"{len(train_samples)} train devices available, sizes {sizes}")
 
-    out_csv = os.path.join("C:/Users/ehsan/AppData/Local/Temp/claude/cfg2", "data_size_sweep.csv")
+    out_csv = os.path.join(out, "data_size_sweep.csv")
     rows = []
     for n in sizes:
         print(f"\n=== {n} training devices " + "=" * 40)

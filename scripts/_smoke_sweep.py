@@ -14,6 +14,10 @@ How many rays, at what ray resolution, does it take to recover the transition
 lines?  For every (rays, points) pair this trains the model from scratch and
 scores it on the test devices, then writes budget_sweep.csv.
 
+Every run creates its own folder, runs/<timestamp>_sweep/, holding
+budget_sweep.csv, one checkpoint per cell, and a config.json of the settings.
+Nothing an earlier run made is ever overwritten.
+
 It is steps 2 and 3 in a loop — same functions, same checkpoints in models/ —
 so any single cell can be reproduced on its own with train_model.py and
 evaluate_model.py.
@@ -28,12 +32,15 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from dqd.ml import grid_dataset, grid_train
+from dqd.ml import grid_dataset, grid_train, run_dir
 from dqd.ml.grid_baseline import score_hough
 from dqd.ml.grid_metrics import evaluate
 
 KEYS = ("f1@0", "f1@1", "f1@2", "f1@3", "iou")
 
+
+RUNSDIR = "C:/Users/ehsan/AppData/Local/Temp/claude/cfg2/runs"
+CACHE = "C:/Users/ehsan/AppData/Local/Temp/claude/cfg2/cache"
 
 def main():
     # ══════════════════════════════════════════════════════════════════
@@ -54,6 +61,10 @@ def main():
 
     # ══════════════════════════════════════════════════════════════════
 
+    out = run_dir.new_run("sweep", runs_root=RUNSDIR, settings={"train_dir": TRAIN_DIR, "test_dir": TEST_DIR,
+                                    "rays": RAYS, "points": POINTS,
+                                    "epochs": EPOCHS})
+
     train_samples = grid_dataset.find_samples([TRAIN_DIR])
     test_samples = grid_dataset.find_samples([TEST_DIR])
     if not train_samples or not test_samples:
@@ -61,8 +72,8 @@ def main():
     print(f"{len(train_samples)} train devices, {len(test_samples)} test "
           f"devices, {len(RAYS) * len(POINTS)} cells")
 
-    cache = os.path.join("C:/Users/ehsan/AppData/Local/Temp/claude/cfg2", "cache")
-    out_csv = os.path.join("C:/Users/ehsan/AppData/Local/Temp/claude/cfg2", "budget_sweep.csv")
+    cache = CACHE
+    out_csv = os.path.join(out, "budget_sweep.csv")
     rows = []
 
     for R in RAYS:
@@ -75,7 +86,7 @@ def main():
 
             net, thr = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
             grid_train.save(net, thr,
-                            os.path.join("C:/Users/ehsan/AppData/Local/Temp/claude/cfg2", "models",
+                            os.path.join(out, "models",
                                          grid_train.checkpoint_name(R, P)),
                             R, P, extra={"n_train": len(Xtr)})
 

@@ -3,7 +3,11 @@ make_figures.py — MAIN PROGRAM 6.  Turn the CSVs and a checkpoint into figures
 
     python make_figures.py
 
-Writes into figures/ :
+By default it finds the newest sweep results under runs/ and writes the
+figures into that same run folder, so a trial's figures live beside the CSVs
+and checkpoints that produced them.
+
+Writes into <run folder>/figures/ :
 
     fig_budget_rays.png       F1 vs number of rays, one line per ray resolution
     fig_budget_coverage.png   F1 vs how much of the diagram was measured
@@ -32,7 +36,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dqd.ml import grid_dataset, grid_train
+from dqd.ml import grid_dataset, grid_train, run_dir
 
 # ── Palette ───────────────────────────────────────────────────────────
 # Categorical slots 1-3 of the reference palette, in fixed order.  This
@@ -46,7 +50,6 @@ INK_2 = "#52514e"                               # secondary text
 GRID = "#e2e2de"                                # recessive gridlines
 SURFACE = "#ffffff"
 
-FIG_DIR = os.path.join("..", "figures")
 DPI = 300
 
 
@@ -66,9 +69,9 @@ def _style(ax, xlabel, ylabel, title=None):
         ax.set_title(title, color=INK, fontsize=11, pad=10, loc="left")
 
 
-def _save(fig, name):
-    os.makedirs(FIG_DIR, exist_ok=True)
-    path = os.path.join(FIG_DIR, name)
+def _save(fig, name, fig_dir):
+    os.makedirs(fig_dir, exist_ok=True)
+    path = os.path.join(fig_dir, name)
     fig.savefig(path, dpi=DPI, facecolor=SURFACE, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {path}")
@@ -96,7 +99,7 @@ def _num(v):
 # Figure 1: F1 vs number of rays, one line per ray resolution
 # ----------------------------------------------------------------------
 
-def fig_budget_rays(rows):
+def fig_budget_rays(rows, fig_dir):
     resolutions = sorted({int(r["n_points"]) for r in rows})
     if len(resolutions) > len(SERIES):
         # Three is the validated series cap for this palette; more than that
@@ -132,14 +135,14 @@ def fig_budget_rays(rows):
 
     ax.set_ylim(0, 1)
     ax.legend(frameon=False, fontsize=9, labelcolor=INK_2, loc="lower right")
-    _save(fig, "fig_budget_rays.png")
+    _save(fig, "fig_budget_rays.png", fig_dir)
 
 
 # ----------------------------------------------------------------------
 # Figure 2: F1 vs measured coverage — the true cost axis
 # ----------------------------------------------------------------------
 
-def fig_budget_coverage(rows):
+def fig_budget_coverage(rows, fig_dir):
     """
     Rays and points both cost measurement time; coverage is what they buy.
     Plotting against coverage collapses the two knobs into the quantity an
@@ -169,14 +172,14 @@ def fig_budget_coverage(rows):
 
     ax.set_ylim(0, 1)
     ax.legend(frameon=False, fontsize=9, labelcolor=INK_2, loc="lower right")
-    _save(fig, "fig_budget_coverage.png")
+    _save(fig, "fig_budget_coverage.png", fig_dir)
 
 
 # ----------------------------------------------------------------------
 # Figure 3: learning curve
 # ----------------------------------------------------------------------
 
-def fig_data_size(rows):
+def fig_data_size(rows, fig_dir):
     srt = sorted(rows, key=lambda r: r["n_train"])
     fig, ax = plt.subplots(figsize=(6.0, 4.2))
     _style(ax, "training devices", "transition-line F1  (tolerance 1 px)",
@@ -191,14 +194,14 @@ def fig_data_size(rows):
         ax.annotate(f"{int(b['n_rays'])} rays x {int(b['n_points'])} points",
                     (0.02, 0.95), xycoords="axes fraction",
                     fontsize=9, color=INK_2, va="top")
-    _save(fig, "fig_data_size.png")
+    _save(fig, "fig_data_size.png", fig_dir)
 
 
 # ----------------------------------------------------------------------
 # Figure 4: what the model actually draws
 # ----------------------------------------------------------------------
 
-def fig_examples(test_dir, model_path, n_examples=3):
+def fig_examples(test_dir, model_path, fig_dir, n_examples=3):
     """
     One row per device: the measurement it was given, what it predicted, the
     truth, and the two overlaid.  A table of F1 values cannot show whether
@@ -255,7 +258,7 @@ def fig_examples(test_dir, model_path, n_examples=3):
                  f"blue: predicted, orange: measured peaks",
                  fontsize=10, color=INK_2, y=1.0)
     fig.tight_layout()
-    _save(fig, "fig_examples.png")
+    _save(fig, "fig_examples.png", fig_dir)
 
 
 def main():
@@ -263,30 +266,54 @@ def main():
     #  SETTINGS
     # ══════════════════════════════════════════════════════════════════
 
-    BUDGET_CSV = os.path.join("..", "budget_sweep.csv")
-    DATA_SIZE_CSV = os.path.join("..", "data_size_sweep.csv")
+    # Leave these as None to use the newest run of each kind under runs/.
+    # Set one to a path to re-draw an older trial instead.
+    BUDGET_CSV = None
+    DATA_SIZE_CSV = None
+    MODEL_PATH = None
+
     TEST_DIR = os.path.join("..", "training_data", "ml_test_split_n500_res100")
-    MODEL_PATH = os.path.join("..", "models", "rays6_points100.pt")
     N_EXAMPLES = 3
 
     # ══════════════════════════════════════════════════════════════════
 
+    budget_csv = BUDGET_CSV or run_dir.find_file("budget_sweep.csv", "sweep")
+    size_csv = DATA_SIZE_CSV or run_dir.find_file("data_size_sweep.csv",
+                                                  "datasize")
+    model = MODEL_PATH or run_dir.find_file(
+        os.path.join("models", "rays6_points100.pt"))
+
+    # Figures go beside the results that produced them.  When several runs
+    # contribute, the newest one hosts them.
+    hosts = [os.path.dirname(p) for p in (budget_csv, size_csv, model) if p]
+    if not hosts:
+        sys.exit("nothing to plot yet — run a sweep or train_model.py first")
+    host = max(hosts)
+    if os.path.basename(host) == "models":
+        host = os.path.dirname(host)
+    fig_dir = os.path.join(host, "figures")
+    print(f"figures -> {fig_dir}\n")
+
     print("budget sweep figures:")
-    rows = _read_csv(BUDGET_CSV)
+    rows = _read_csv(budget_csv) if budget_csv else None
     if rows:
-        fig_budget_rays(rows)
-        fig_budget_coverage(rows)
+        fig_budget_rays(rows, fig_dir)
+        fig_budget_coverage(rows, fig_dir)
+    elif not budget_csv:
+        print("  [skip] no budget_sweep.csv in runs/")
 
     print("data-size figure:")
-    rows = _read_csv(DATA_SIZE_CSV)
+    rows = _read_csv(size_csv) if size_csv else None
     if rows:
-        fig_data_size(rows)
+        fig_data_size(rows, fig_dir)
+    elif not size_csv:
+        print("  [skip] no data_size_sweep.csv in runs/")
 
     print("example predictions:")
-    if os.path.isfile(MODEL_PATH):
-        fig_examples(TEST_DIR, MODEL_PATH, N_EXAMPLES)
+    if model and os.path.isfile(model):
+        fig_examples(TEST_DIR, model, fig_dir, N_EXAMPLES)
     else:
-        print(f"  [skip] {MODEL_PATH} not found — run train_model.py")
+        print("  [skip] no checkpoint in runs/ — run train_model.py")
 
 
 if __name__ == "__main__":
