@@ -107,8 +107,8 @@ KEEP_IMAGES = False
 # Every combination of these is trained and scored, so this is
 # len(RAYS) x len(POINTS) full trainings.  Start small, widen once the shape
 # of the curve is clear.
-RAYS = [4, 6]
-POINTS = [50]
+RAYS = [4, 7]
+POINTS = [80]
 
 
 # RAYS = [2, 4, 6, 8, 12]
