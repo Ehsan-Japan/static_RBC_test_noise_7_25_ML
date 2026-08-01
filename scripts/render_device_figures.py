@@ -111,12 +111,16 @@ def _finish(fig, ax, ux, uy, handles, name, fig_dir):
     print(f"  wrote {os.path.abspath(path)}")
 
 
-def render_sample(sdir, tag, fig_dir, net=None, thr=None):
-    """All panels for one device folder."""
+def render_sample(sdir, tag, fig_dir, net=None, thr=None,
+                  n_rays=None, n_points=None):
+    """All panels for one device folder.  The measurement budget defaults to
+    the SETTINGS above; callers with their own budget pass it explicitly."""
+    n_rays = N_RAYS if n_rays is None else n_rays
+    n_points = N_POINTS if n_points is None else n_points
     ux, uy, Z = load_grid(sdir)                  # normalised sensor signal
     Y = load_ground_truth(sdir)
-    X, _ = grid_dataset.build([sdir], N_RAYS, N_POINTS, verbose=False)
-    peaks, visited = X[0, 0], X[0, 1]
+    X, _ = grid_dataset.build([sdir], n_rays, n_points, verbose=False)
+    visited, peaks = X[0, 1], X[0, 2]     # ch0 is the raw signal (net input)
     x_edges, y_edges = _edges(ux, uy)
 
     truth_patch = Patch(facecolor="black", edgecolor="black",

@@ -8,6 +8,7 @@ Edit the SETTINGS block below and run it.  It does the whole study:
     STAGE 1  make the devices        (simulator)
     STAGE 2  the rays x points sweep (train + evaluate every budget)
     STAGE 3  summary table + figures (budget_sweep.csv, figures/*.png)
+    STAGE 4  full analysis of every test device (sample_<i>/ folders)
 
 The question it answers: how many rays, at what ray resolution, does it take
 to recover the transition lines?  For every (rays, points) pair it trains the
@@ -21,6 +22,11 @@ WHERE THINGS GO — nothing an earlier run made is ever touched.
       budget_sweep.csv               the results
       models/                        one checkpoint per budget
       figures/                       for make_figures.py
+      sample_<i>/                    STAGE 4: the full per-device analysis of
+                                     every test device (rays, peaks.json,
+                                     summary*.png, cropped_results/, gifs/,
+                                     ml_* panels) — render_test_sample_analysis
+                                     output, inside the run itself
 
     training_data/ml_*_n*_res*/      the devices
     grid_cache/                      the measured rays
@@ -64,6 +70,7 @@ from dqd.simulation import device_factory
 # The figures, from the program that owns them.  scripts/ is on sys.path when
 # either program is run directly, so a sibling import is enough.
 from make_figures import fig_budget_coverage, fig_budget_rays, fig_examples
+from render_test_sample_analysis import analyse_test_devices
 
 # ══════════════════════════════════════════════════════════════════════
 #  SETTINGS — everything you can change is here
@@ -118,11 +125,31 @@ POINTS = [50]
 # Fewer epochs than train_model.py, because this runs many times over.
 EPOCHS = 30
 
+# Probability threshold that turns the model's per-pixel probabilities into
+# the binary line map.  None = pick automatically (the value maximising
+# tolerant F1 on the validation split, the current behaviour).  A number,
+# e.g. 0.5, uses exactly that threshold in every cell instead.
+THRESHOLD = None
+
 # ---- STAGE 3: the figures --------------------------------------------
 
 # Test devices drawn in fig_examples.png — enough to see failure modes,
 # few enough to read.
 N_EXAMPLES = 3
+
+# ---- STAGE 4: full per-device analysis of the test devices -----------
+
+# True writes <run>/sample_<i>/ for every test device: the complete original
+# pipeline output (rays + per-ray plots, peaks.json, summary*.png,
+# cropped_results/ with the peak crops and sweeps, gifs/, evaluation.txt ...)
+# plus the ML panels (ml_stability / ml_measurement / ml_truth /
+# ml_prediction / ml_overlay), all from this run's best checkpoint.  It is by
+# far the slowest stage — turn it off for bulk sweeps.
+SAVE_SAMPLE_ANALYSIS = True
+
+# Sweep GIFs are the slowest part of that analysis; 100 dpi keeps them cheap.
+SAVE_GIFS = True
+GIF_DPI = 100
 
 # ══════════════════════════════════════════════════════════════════════
 
@@ -139,6 +166,9 @@ def settings_record():
         "coulomb_peak_width": COULOMB_PEAK_WIDTH, "temperature": TEMPERATURE,
         "seed": SEED,
         "rays": RAYS, "points": POINTS, "epochs": EPOCHS,
+        "threshold": THRESHOLD,
+        "save_sample_analysis": SAVE_SAMPLE_ANALYSIS,
+        "save_gifs": SAVE_GIFS, "gif_dpi": GIF_DPI,
     }
 
 
@@ -205,6 +235,8 @@ def run_cell(out, train_samples, test_samples, n_rays, n_points):
                                          cache_dir=cache, tag="test")
 
     net, thr = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
+    if THRESHOLD is not None:
+        thr = THRESHOLD               # manual override from the settings
     ckpt = os.path.join(out, "models",
                         grid_train.checkpoint_name(n_rays, n_points))
     grid_train.save(net, thr, ckpt, n_rays, n_points,
@@ -217,7 +249,7 @@ def run_cell(out, train_samples, test_samples, n_rays, n_points):
             # measured pixels as a fraction of the grid: the honest x-axis
             # for "measurement budget" in the paper
             "coverage": float(Xte[:, 1].mean()),
-            "peak_frac": float(Xte[:, 0].mean()),
+            "peak_frac": float(Xte[:, 2].mean()),
             "threshold": thr,
             **{f"ml_{k}": m[k] for k in KEYS},
             **{f"hough_{k}": h[k] for k in KEYS}}
@@ -295,6 +327,34 @@ def make_figures(out, rows, test_dir):
     fig_examples(test_dir, ckpt, fig_dir, n_examples=N_EXAMPLES)
 
 
+# ──────────────────────────────────────────────────────────────────────
+#  STAGE 4 — full per-device analysis of the test devices
+# ──────────────────────────────────────────────────────────────────────
+
+def analyse_samples(out, rows, test_dir):
+    """
+    <run>/sample_<i>/ for every test device — everything the original
+    pipeline produces for a device plus the ML panels, exactly what
+    render_test_sample_analysis.py makes, but inside THIS run's folder and
+    from this run's best checkpoint.  The code is that program's own
+    (analyse_test_devices), so the two outputs can never drift apart.
+    """
+    best = max(rows, key=lambda r: r["ml_f1@1"])
+    n_rays, n_points = int(best["n_rays"]), int(best["n_points"])
+    ckpt = os.path.join(out, "models",
+                        grid_train.checkpoint_name(n_rays, n_points))
+    net, ck = grid_train.load(ckpt)
+    print(f"\n=== STAGE 4  per-device analysis: {n_rays} rays x "
+          f"{n_points} points " + "=" * 15)
+    analyse_test_devices(
+        out, test_dir, net, ck["threshold"],
+        n_test=N_TEST, seed=SEED, n_rays=n_rays, n_points=n_points,
+        resolution=RESOLUTION, voltage_window=VOLTAGE_WINDOW,
+        coulomb_peak_width=COULOMB_PEAK_WIDTH, temperature=TEMPERATURE,
+        disjoint_intervals=DISJOINT_INTERVALS,
+        save_gifs=SAVE_GIFS, gif_dpi=GIF_DPI)
+
+
 def main():
     train_dir, test_dir = dataset_dirs()
 
@@ -309,6 +369,8 @@ def main():
     rows, out_csv = run_sweep(out, train_dir, test_dir)
     summarise(rows, out_csv)
     make_figures(out, rows, test_dir)
+    if SAVE_SAMPLE_ANALYSIS:
+        analyse_samples(out, rows, test_dir)
     print(f"\neverything for this trial is in {os.path.abspath(out)}")
 
 

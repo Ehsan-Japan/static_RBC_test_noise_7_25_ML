@@ -74,7 +74,7 @@ def main():
     result = {"model": os.path.abspath(model_path),
               "n_rays": R, "n_points": P, "n_test": len(X), "threshold": thr,
               "coverage": float(X[:, 1].mean()),
-              "peak_frac": float(X[:, 0].mean()),
+              "peak_frac": float(X[:, 2].mean()),
               "ml": evaluate(grid_train.predict(net, X) > thr, Y),
               "hough": score_hough(X, Y)}
 

@@ -1,9 +1,11 @@
 """
 ray_peaks.py — the measurement, reproduced offline at any budget.
 
-One "measurement" of a sample is: fire R rays across the stability diagram,
-sample P points along each, and record where the peaks are.  Those peak
-positions are the ONLY thing the 2-D reconstruction model is allowed to see.
+One "measurement" of a sample is: fire R rays across the stability diagram
+and sample P points along each.  Those R x P raw signal values (placed at the
+pixels where they were measured, plus the visited mask) are the ONLY thing
+the 2-D reconstruction model is allowed to see.  Peaks are still detected,
+but only for the classical Hough baseline and the figures.
 
 The ray geometry copies RayProcessor._measure_ray exactly, so a measurement
 produced here is the measurement the pipeline makes:
@@ -33,16 +35,28 @@ class Measurement:
     """
     What one (n_rays, n_points) measurement of a sample yields.
 
-    peak_rc   : (n_peaks, 2) int   (row, col) pixels where a peak was found
-    visited_rc: (n_visited, 2) int (row, col) pixels any ray passed through
-    traces    : (n_rays, n_points) float32  the sampled sensor traces
+    peak_rc    : (n_peaks, 2) int   (row, col) pixels where a peak was found
+    visited_rc : (n_visited, 2) int (row, col) pixels any ray passed through
+    visited_val: (n_visited,) float32 sensor signal at each visited pixel
+    traces     : (n_rays, n_points) float32  the sampled sensor traces
     n_rays / n_points : the budget that produced it
     """
     peak_rc: np.ndarray
     visited_rc: np.ndarray
+    visited_val: np.ndarray
     traces: np.ndarray
     n_rays: int
     n_points: int
+
+
+# Channel layout of the network input built by to_channels().  The NETWORK
+# sees only the first two — the raw measurement.  The peaks channel exists
+# solely for the classical Hough baseline and the measurement figures, so
+# model and baseline are compared at identical budget.
+CH_SIGNAL = 0        # raw sensor signal along the rays
+CH_VISITED = 1       # 1 where any ray passed
+CH_PEAKS = 2         # find_peaks output — baseline / figures only
+NET_CHANNELS = 2     # the network input is X[:, :NET_CHANNELS]
 
 
 # ----------------------------------------------------------------------
@@ -174,30 +188,41 @@ def measure(sample_dir: str,
         return np.unique(np.stack([np.concatenate(rows),
                                    np.concatenate(cols)], axis=1), axis=0)
 
+    visited = _stack(seen_rows, seen_cols)
+    # Sampling is nearest-cell, so the signal at a visited pixel is exactly
+    # the grid value there — dedup-safe by construction.
+    values = (Z[visited[:, 0], visited[:, 1]].astype(np.float32)
+              if len(visited) else np.empty(0, dtype=np.float32))
     return Measurement(peak_rc=_stack(peak_rows, peak_cols),
-                       visited_rc=_stack(seen_rows, seen_cols),
+                       visited_rc=visited, visited_val=values,
                        traces=traces, n_rays=n_rays, n_points=n_points)
 
 
 def to_channels(m: Measurement, shape: Tuple[int, int]) -> np.ndarray:
     """
-    Measurement -> (2, H, W) float32 network input.
+    Measurement -> (3, H, W) float32.  The NETWORK sees only the first two.
 
-    ch0 "peaks"   : 1 where a ray peak was detected
-    ch1 "visited" : 1 where any ray passed
+    ch0 CH_SIGNAL  : the raw sensor signal at every pixel a ray visited —
+                     all n_rays x n_points measured values, each placed at
+                     the pixel where it was measured
+    ch1 CH_VISITED : 1 where any ray passed
+    ch2 CH_PEAKS   : 1 where find_peaks fired — NOT network input; kept so
+                     the Hough baseline and the measurement figures get the
+                     classical peaks at identical budget
 
-    The second channel is what separates "measured here, no transition" from
-    "never looked here".  Without it a sparse ch0 is ambiguous everywhere and
-    the network cannot tell absence of evidence from evidence of absence.
+    The visited channel is what separates "measured here, signal ~0" from
+    "never looked here".  Without it a zero in ch0 is ambiguous everywhere
+    and the network cannot tell absence of evidence from evidence of absence.
 
-    Crucially the shape is (2, H, W) for EVERY budget: n_rays and n_points
+    Crucially the shape is (3, H, W) for EVERY budget: n_rays and n_points
     change how sparse this input is, never how big it is.  One architecture,
     one parameter count, across the whole sweep — so a difference in accuracy
     is a difference in measurement budget and nothing else.
     """
-    x = np.zeros((2, *shape), dtype=np.float32)
-    if len(m.peak_rc):
-        x[0, m.peak_rc[:, 0], m.peak_rc[:, 1]] = 1.0
+    x = np.zeros((3, *shape), dtype=np.float32)
     if len(m.visited_rc):
-        x[1, m.visited_rc[:, 0], m.visited_rc[:, 1]] = 1.0
+        x[CH_SIGNAL, m.visited_rc[:, 0], m.visited_rc[:, 1]] = m.visited_val
+        x[CH_VISITED, m.visited_rc[:, 0], m.visited_rc[:, 1]] = 1.0
+    if len(m.peak_rc):
+        x[CH_PEAKS, m.peak_rc[:, 0], m.peak_rc[:, 1]] = 1.0
     return x

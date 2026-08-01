@@ -230,7 +230,7 @@ def fig_examples(test_dir, model_path, fig_dir, n_examples=3):
         ax = axes[row, 0]
         ax.imshow(1 - 0.12 * X[row, 1], cmap="gray", vmin=0, vmax=1,
                   origin="lower", interpolation="nearest")
-        ys, xs = np.nonzero(X[row, 0])
+        ys, xs = np.nonzero(X[row, 2])          # ch2 = peaks (figures only)
         ax.plot(xs, ys, "o", color=SERIES[1], markersize=2.5, linestyle="none")
 
         # 2/3. prediction and truth, black on white like the other figures

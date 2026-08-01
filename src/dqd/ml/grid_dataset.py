@@ -3,7 +3,8 @@ grid_dataset.py — (ray peaks -> transition-line map) pairs at a given budget.
 
 For every finished sample this builds one training example:
 
-    X : (2, H, W)  ch0 ray peaks, ch1 visited pixels   <- the measurement
+    X : (3, H, W)  ch0 raw signal along rays, ch1 visited pixels (the
+                   network input), ch2 ray peaks (baseline/figures only)
     Y : (H, W)     1.0 on a transition line            <- the answer
 
 Y is ground_truth_labels.npy, the exact binary map of every transition line
@@ -52,7 +53,7 @@ def build(sample_dirs: Sequence[str],
     """
     (X, Y) for a list of samples at one budget.
 
-    X : (N, 2, H, W) float32
+    X : (N, 3, H, W) float32
     Y : (N, H, W)    float32
 
     Samples whose grids disagree in size are skipped with a warning rather
@@ -95,8 +96,10 @@ def build_cached(sample_dirs: Sequence[str],
     os.makedirs(cache_dir, exist_ok=True)
     det = "ml" if detector is not None else "classical"
     sig = hashlib.sha1("|".join(sample_dirs).encode()).hexdigest()[:8]
+    # "trace" marks the 3-channel signal+visited+peaks layout, so caches from
+    # the old 2-channel peaks-only encoding can never be reused by mistake.
     path = os.path.join(
-        cache_dir, f"{tag}_r{n_rays}_p{n_points}_{det}_{sig}.npz")
+        cache_dir, f"{tag}_r{n_rays}_p{n_points}_{det}_trace_{sig}.npz")
     if os.path.isfile(path) and not rebuild:
         print(f"reusing cached {tag}: {os.path.abspath(path)}")
         d = np.load(path)
@@ -106,7 +109,7 @@ def build_cached(sample_dirs: Sequence[str],
     X, Y = build(sample_dirs, n_rays, n_points, detector=detector)
     np.savez_compressed(path, X=X, Y=Y)
     print(f"  cached -> {os.path.abspath(path)}   X{X.shape}, "
-          f"{100 * X[:, 0].mean():.3f}% of pixels are peaks, "
+          f"{100 * X[:, 1].mean():.3f}% of pixels measured, "
           f"{100 * Y.mean():.2f}% are transition lines")
     return X, Y
 

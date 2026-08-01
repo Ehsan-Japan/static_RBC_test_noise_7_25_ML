@@ -21,6 +21,7 @@ from typing import Sequence
 import numpy as np
 
 from .grid_metrics import evaluate
+from .ray_peaks import CH_PEAKS
 
 
 def hough_predict(peaks: np.ndarray,
@@ -76,7 +77,7 @@ def score_hough(X: np.ndarray, Y: np.ndarray,
     """
     best = None
     for n in n_lines_grid:
-        preds = np.stack([hough_predict(x[0], n_lines=n) for x in X])
+        preds = np.stack([hough_predict(x[CH_PEAKS], n_lines=n) for x in X])
         m = evaluate(preds, Y)
         if best is None or m["f1@1"] > best[1]["f1@1"]:
             best = (n, m)

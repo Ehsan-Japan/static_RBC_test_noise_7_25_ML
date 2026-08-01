@@ -42,6 +42,7 @@ matplotlib.use("Agg")
 import numpy as np
 
 from dqd.config import paths
+from dqd.config.capacitance_config import CapacitanceConfig
 from dqd.ml import grid_train, run_dir
 from dqd.ml.train_test_config import split_configs
 from dqd.pipeline.dataset_pipeline import DatasetPipeline
@@ -72,14 +73,17 @@ GIF_DPI = 100
 # ══════════════════════════════════════════════════════════════════════
 
 
-def replay_matrices():
-    """The exact capacitance matrices of test devices 1..N_TEST, in order."""
-    _, test_cfg = split_configs()
-    gen = CapacitanceMatrixGenerator(seed=SEED + 1000)
-    return [gen.generate_all(test_cfg) for _ in range(N_TEST)]
+def replay_matrices(n_test=N_TEST, seed=SEED, disjoint_intervals=True):
+    """The exact capacitance matrices of test devices 1..n_test, in order."""
+    if disjoint_intervals:
+        _, test_cfg = split_configs()
+    else:
+        test_cfg = CapacitanceConfig()
+    gen = CapacitanceMatrixGenerator(seed=seed + 1000)
+    return [gen.generate_all(test_cfg) for _ in range(n_test)]
 
 
-def check_same_device(analysis_dir, test_sdir, i):
+def check_same_device(analysis_dir, test_sdir, i, test_dir=TEST_DIR):
     """Refuse to continue if the replayed device is not the stored one."""
     a = np.load(os.path.join(analysis_dir, "numpy", "simulation",
                              "charge_sensing_data.npy"))
@@ -88,8 +92,65 @@ def check_same_device(analysis_dir, test_sdir, i):
     if a.shape != b.shape or not np.allclose(a, b, atol=1e-10):
         sys.exit(f"sample_{i}: replayed device does not match the stored "
                  f"test device — the settings above disagree with the run "
-                 f"that generated {os.path.abspath(TEST_DIR)}")
+                 f"that generated {os.path.abspath(test_dir)}")
     print(f"  sample_{i}: replayed device matches the stored test arrays")
+
+
+def analyse_test_devices(out, test_dir, net, thr,
+                         n_test=N_TEST, seed=SEED,
+                         n_rays=N_RAYS, n_points=N_POINTS,
+                         resolution=100,
+                         voltage_window=(-1.0, 1.0, -1.0, 1.0),
+                         coulomb_peak_width=0.01, temperature=0.00001,
+                         disjoint_intervals=True,
+                         save_gifs=SAVE_GIFS, gif_dpi=GIF_DPI):
+    """
+    The full per-device analysis for every test device, into
+    <out>/sample_<i>/: the whole original-pipeline output (rays, peaks.json,
+    summary*.png, cropped_results/, gifs/, evaluation.txt ...) plus the ML
+    panels (ml_stability / ml_measurement / ml_truth / ml_prediction /
+    ml_overlay).  Every replayed device is checked bit-for-bit against the
+    stored test arrays before anything ML is drawn from them.
+    """
+    vx_min, vx_max, vy_min, vy_max = voltage_window
+    # One pipeline, configured exactly like the original project's
+    # run_simulation.py; fixed_matrices is swapped per device.
+    pipeline = DatasetPipeline(
+        base_save_dir=out,
+        n_samples=n_test,
+        num_angles=n_rays,
+        ray_resolution=n_points,
+        x_resolution=resolution,
+        y_resolution=resolution,
+        vx_min=vx_min, vx_max=vx_max, vy_min=vy_min, vy_max=vy_max,
+        crop_size=1,
+        col_buffer=2,
+        coulomb_peak_width=coulomb_peak_width,
+        temperature=temperature,
+        plot_dpi=300,
+        save_gifs=save_gifs,
+        gif_dpi=gif_dpi,
+        x_axis_name="P1", y_axis_name="P2",
+        x_axis_unit="mV", y_axis_unit="mV",
+        figure_width_in=12.0, figure_height_in=12.0,
+        peak_neighbor_cols=2,
+    )
+
+    matrices_list = replay_matrices(n_test, seed, disjoint_intervals)
+    for i, matrices in enumerate(matrices_list, 1):
+        sample_out = os.path.join(out, f"sample_{i}")
+        print(f"\n{'=' * 60}\n  test device {i}/{n_test}\n"
+              f"  {os.path.abspath(sample_out)}\n{'=' * 60}")
+        os.makedirs(sample_out, exist_ok=True)
+        pipeline.fixed_matrices = matrices
+        pipeline._run_sample(i, sample_out)
+
+        test_sdir = os.path.join(test_dir, f"sample_{i}")
+        check_same_device(sample_out, test_sdir, i, test_dir)
+
+        # The ML panels, from the SAME stored arrays the model was scored on.
+        render_sample(test_sdir, "ml", sample_out, net, thr,
+                      n_rays=n_rays, n_points=n_points)
 
 
 def main():
@@ -111,42 +172,7 @@ def main():
         "model_path": os.path.abspath(model_path),
         "save_gifs": SAVE_GIFS, "gif_dpi": GIF_DPI})
 
-    # One pipeline, configured exactly like the original project's
-    # run_simulation.py; fixed_matrices is swapped per device.
-    pipeline = DatasetPipeline(
-        base_save_dir=out,
-        n_samples=N_TEST,
-        num_angles=N_RAYS,
-        ray_resolution=N_POINTS,
-        x_resolution=100,
-        y_resolution=100,
-        vx_min=-1.0, vx_max=1.0, vy_min=-1.0, vy_max=1.0,
-        crop_size=1,
-        col_buffer=2,
-        coulomb_peak_width=0.01,
-        temperature=0.00001,
-        plot_dpi=300,
-        save_gifs=SAVE_GIFS,
-        gif_dpi=GIF_DPI,
-        x_axis_name="P1", y_axis_name="P2",
-        x_axis_unit="mV", y_axis_unit="mV",
-        figure_width_in=12.0, figure_height_in=12.0,
-        peak_neighbor_cols=2,
-    )
-
-    for i, matrices in enumerate(replay_matrices(), 1):
-        sample_out = os.path.join(out, f"sample_{i}")
-        print(f"\n{'=' * 60}\n  test device {i}/{N_TEST}\n"
-              f"  {os.path.abspath(sample_out)}\n{'=' * 60}")
-        os.makedirs(sample_out, exist_ok=True)
-        pipeline.fixed_matrices = matrices
-        pipeline._run_sample(i, sample_out)
-
-        test_sdir = os.path.join(TEST_DIR, f"sample_{i}")
-        check_same_device(sample_out, test_sdir, i)
-
-        # The ML panels, from the SAME stored arrays the model was scored on.
-        render_sample(test_sdir, "ml", sample_out, net, thr)
+    analyse_test_devices(out, TEST_DIR, net, thr)
 
     print(f"\neverything is in {os.path.abspath(out)}")
 

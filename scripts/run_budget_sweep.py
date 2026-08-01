@@ -100,7 +100,7 @@ def main():
                    # measured pixels as a fraction of the grid: the honest
                    # x-axis for "measurement budget" in the paper
                    "coverage": float(Xte[:, 1].mean()),
-                   "peak_frac": float(Xte[:, 0].mean()),
+                   "peak_frac": float(Xte[:, 2].mean()),
                    "threshold": thr,
                    **{f"ml_{k}": m[k] for k in KEYS},
                    **{f"hough_{k}": h[k] for k in KEYS}}

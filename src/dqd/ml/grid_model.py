@@ -1,10 +1,10 @@
 """
-grid_model.py — RayToLinesNet: sparse ray peaks -> dense transition-line map.
+grid_model.py — RayToLinesNet: sparse ray traces -> dense transition-line map.
 
-Input  : (batch, 2, H, W)  ch0 peaks, ch1 visited
+Input  : (batch, 2, H, W)  ch0 raw sensor signal along the rays, ch1 visited
 Output : (batch, H, W)     per-pixel transition LOGIT (sigmoid -> probability)
 
-A small U-Net.  The task is sparse-to-dense: a few dozen peak pixels have to
+A small U-Net.  The task is sparse-to-dense: a few thin rays of signal have to
 become continuous lines across the whole diagram, so the network needs both a
 wide view (which slope family is this, where do the parallel lines repeat) and
 pixel-precise output (a line one pixel wide).  Down-and-up with skips is the

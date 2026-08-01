@@ -26,6 +26,7 @@ import torch.nn as nn
 
 from .grid_metrics import evaluate
 from .grid_model import RayToLinesNet
+from .ray_peaks import NET_CHANNELS
 
 # Thresholds scanned on the validation split to turn probabilities into a
 # binary map.  A single fixed 0.5 is the wrong choice here: the class weight
@@ -75,12 +76,18 @@ def _soft_dice(logits: torch.Tensor, target: torch.Tensor,
 
 
 def predict(net, X: np.ndarray, batch: int = 16) -> np.ndarray:
-    """Per-pixel probabilities for a stack of inputs."""
+    """
+    Per-pixel probabilities for a stack of inputs.
+
+    X may carry extra channels (the peaks channel the baseline uses); the
+    network is only ever shown the measurement — signal + visited.
+    """
     net.eval()
+    Xn = X[:, :NET_CHANNELS]
     out = []
     with torch.no_grad():
-        for i in range(0, len(X), batch):
-            out.append(torch.sigmoid(net(torch.tensor(X[i:i + batch]))).numpy())
+        for i in range(0, len(Xn), batch):
+            out.append(torch.sigmoid(net(torch.tensor(Xn[i:i + batch]))).numpy())
     return np.concatenate(out)
 
 
@@ -110,9 +117,10 @@ def train(X: np.ndarray, Y: np.ndarray, epochs: int = 40,
     n_val = max(1, int(VAL_FRACTION * len(X)))
     vi, ti = idx[:n_val], idx[n_val:]
     Xv, Yv = X[vi], Y[vi]
-    Xt, Yt = torch.tensor(X[ti]), torch.tensor(Y[ti])
+    Xt = torch.tensor(X[ti][:, :NET_CHANNELS])
+    Yt = torch.tensor(Y[ti])
 
-    net = RayToLinesNet(in_channels=X.shape[1])
+    net = RayToLinesNet(in_channels=NET_CHANNELS)
     pos = float(Y.mean())
     pos_w = min((1 - pos) / max(pos, 1e-6), MAX_POS_WEIGHT)
     bce = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_w]))
