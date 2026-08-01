@@ -37,7 +37,7 @@ def main():
     # ══════════════════════════════════════════════════════════════════
 
     # Which devices to train on — the folder generate_ml_data.py wrote.
-    TRAIN_DIR = paths.training_data("ml_train_split_n2000_res100")
+    TRAIN_DIR = paths.training_data("ml_train_split_n50_res100")
 
     # The measurement budget: how many rays, and how many points along each.
     # These two are what the whole study is about.

@@ -1,22 +1,25 @@
 """
-generate_ml_data.py — MAIN PROGRAM 1 of 4.  Make the devices.
-
-    1. generate_ml_data.py    <- you are here
-    2. run_budget_sweep.py    the rays x points experiment
-    3. make_figures.py        the figures
-       (train_model.py / evaluate_model.py do one budget at a time)
-
-Every setting is in the SETTINGS block below — one place, nothing hidden in
-the code underneath.  Edit it and run:
+generate_ml_data.py — STAGE 1 ONLY: make the devices, nothing else.
 
     python generate_ml_data.py
 
-Makes both the training and the test set in one go.
+Use this when you want to build a dataset on its own — overnight, or on a
+different machine from the one that trains.  For the actual study run
 
-run_simulation.py runs the FULL analysis pipeline per device: ray plots, peak
+    python run_experiment.py
+
+which does this AND the sweep in one go, under one timestamped run folder.
+The two share the same code (dqd/simulation/device_factory.py) and the same
+folder naming, so devices made here are picked up by run_experiment.py for
+free: give it the same N_TRAIN / N_TEST / RESOLUTION / DISJOINT_INTERVALS and
+its stage 1 finds everything already done and skips straight to the sweep.
+
+Devices are only ever added, never overwritten: re-running tops a folder up.
+
+run_simulation.py runs the FULL analysis pipeline per device — ray plots, peak
 crops, four sweeps per peak, GIFs, overlays, summaries.  That is what you want
-when inspecting one device.  It is far too slow for thousands, and the ML
-study needs exactly two files per device:
+when inspecting one device, and far too slow for thousands.  The ML study
+needs exactly two files per device:
 
     numpy/simulation/charge_sensing_data.npy    the measurement
     numpy/simulation/ground_truth_labels.npy    the answer
@@ -27,31 +30,27 @@ to change the number of rays or points.
 """
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import matplotlib
 matplotlib.use("Agg")
 
-from dqd.config.axis_labels import set_axis_labels
 from dqd.config.capacitance_config import CapacitanceConfig
 from dqd.config import paths
 from dqd.ml.train_test_config import describe, split_configs
-from dqd.simulation.dqd_simulator import DQDSimulator
-from dqd.simulation.matrix_generator import CapacitanceMatrixGenerator
-from dqd.visualization.overlay import OverlayRenderer
-
+from dqd.simulation import device_factory
 
 # ══════════════════════════════════════════════════════════════════════
-#  SETTINGS — everything you can change is here
+#  SETTINGS — keep these identical to run_experiment.py's stage-1 block,
+#  or you will build a dataset it does not look for.
 # ══════════════════════════════════════════════════════════════════════
 
 # How many devices to make.  Recovering lines from a few dozen peaks needs
 # on the order of a thousand training devices before the numbers mean
 # anything.  At ~0.7 s/device, 2000 + 500 is about half an hour.
-N_TRAIN = 50
-N_TEST = 10
+N_TRAIN = 2000
+N_TEST = 500
 
 # Stability-diagram side length in pixels.  Fixes the network's input size,
 # so every device in one study must share it.
@@ -64,8 +63,7 @@ RESOLUTION = 100
 DISJOINT_INTERVALS = True
 
 # Gate-voltage window swept on both axes.
-VX_MIN, VX_MAX = -1.0, 1.0
-VY_MIN, VY_MAX = -1.0, 1.0
+VOLTAGE_WINDOW = (-1.0, 1.0, -1.0, 1.0)      # vx_min, vx_max, vy_min, vy_max
 
 # Simulator physics.
 COULOMB_PEAK_WIDTH = 0.01
@@ -74,104 +72,11 @@ TEMPERATURE = 0.00001
 # One reproducible random stream per split.  Same seed = same devices.
 SEED = 0
 
-# Where the device folders go: <project>/training_data/, regardless of the
-# directory you start this from (dqd/config/paths.py).
-OUT_ROOT = paths.TRAINING_DATA
-
 # True keeps the per-device .jpg previews.  Off for a bulk run — it saves a
 # lot of disk, and nothing downstream reads them.
 KEEP_IMAGES = False
 
 # ══════════════════════════════════════════════════════════════════════
-
-
-# Arrays the simulator writes that we keep; everything else is pruned.
-KEEP_FILES = ("charge_sensing_data.npy", "double_dot_data.npy",
-              "ground_truth_labels.npy")
-
-
-def generate(out_dir, n_devices, config, seed):
-    """Simulate n_devices into out_dir, skipping any that already exist."""
-    set_axis_labels(x_name="P1", y_name="P2", x_unit="mV", y_unit="mV")
-    gen = CapacitanceMatrixGenerator(seed=seed)      # one stream, reproducible
-    os.makedirs(out_dir, exist_ok=True)
-    print(f"writing devices to {os.path.abspath(out_dir)}")
-
-    t0, made = time.time(), 0
-    for i in range(1, n_devices + 1):
-        device_dir = os.path.join(out_dir, f"sample_{i}")
-        sim_dir = os.path.join(device_dir, "numpy", "simulation")
-        gt_path = os.path.join(sim_dir, "ground_truth_labels.npy")
-        if os.path.isfile(gt_path):
-            continue                                  # resume, don't redo
-        os.makedirs(sim_dir, exist_ok=True)
-
-        sim_params = {
-            "save_dir": device_dir,
-            "capacitance": gen.generate_all(config),
-            "model_params": {"coulomb_peak_width": COULOMB_PEAK_WIDTH,
-                             "T": TEMPERATURE},
-            "xlabel": "P1 (mV)", "ylabel": "P2 (mV)",
-            "voltage_sweep": {"vx_min": VX_MIN, "vx_max": VX_MAX,
-                              "vy_min": VY_MIN, "vy_max": VY_MAX,
-                              "n_points_x": RESOLUTION,
-                              "n_points_y": RESOLUTION},
-            "optimal_Vg": [0.0, 0.0, 0.0],
-            "plot_options": {
-                "charge_sensing_save_path": os.path.join(
-                    device_dir, "charge_sensing.jpg"),
-                "charge_sensing_grad_save_path": os.path.join(
-                    device_dir, "charge_sensing2.jpg"),
-                "dpi": 60,          # the jpgs are a by-product; keep them cheap
-            },
-        }
-        try:
-            DQDSimulator(sim_params).run()
-        except Exception as exc:
-            print(f"[skip] device {i}: {exc}")
-            continue
-
-        # The simulator writes into device_dir; move the arrays we need into
-        # the numpy/simulation/ layout the ML loaders expect.
-        for name in ("charge_sensing_data.npy", "double_dot_data.npy"):
-            src = os.path.join(device_dir, name)
-            if os.path.isfile(src):
-                os.replace(src, os.path.join(sim_dir, name))
-
-        OverlayRenderer.generate_ground_truth_array(
-            data_path=os.path.join(sim_dir, "double_dot_data.npy"),
-            output_npy_path=gt_path,
-            use_double_dot=True,
-        )
-        if not KEEP_IMAGES:
-            _prune(device_dir, sim_dir)
-
-        made += 1
-        if made % 25 == 0:
-            rate = (time.time() - t0) / made
-            print(f"  {i}/{n_devices}  {rate:.2f}s/device  "
-                  f"~{(n_devices - i) * rate / 60:.1f} min left")
-
-    print(f"{made} new devices in {os.path.abspath(out_dir)}  "
-          f"({time.time() - t0:.0f}s)\n")
-
-
-def _prune(device_dir, sim_dir):
-    """Delete everything except the arrays the ML study reads."""
-    for root, dirs, files in os.walk(device_dir, topdown=False):
-        for f in files:
-            path = os.path.join(root, f)
-            if os.path.dirname(path) == sim_dir and f in KEEP_FILES:
-                continue
-            try:
-                os.remove(path)
-            except OSError:
-                pass
-        for d in dirs:
-            try:
-                os.rmdir(os.path.join(root, d))
-            except OSError:
-                pass
 
 
 def main():
@@ -182,19 +87,25 @@ def main():
         train_cfg = test_cfg = CapacitanceConfig()
         print("train and test share the full capacitance intervals\n")
 
-    tag = "split" if DISJOINT_INTERVALS else "same"
+    common = dict(resolution=RESOLUTION, voltage_window=VOLTAGE_WINDOW,
+                  coulomb_peak_width=COULOMB_PEAK_WIDTH,
+                  temperature=TEMPERATURE, keep_images=KEEP_IMAGES)
 
     print(f"── TRAIN: {N_TRAIN} devices " + "─" * 40)
-    generate(os.path.join(OUT_ROOT, f"ml_train_{tag}_n{N_TRAIN}_res{RESOLUTION}"),
-             N_TRAIN, train_cfg, SEED)
+    device_factory.generate(
+        paths.training_data(device_factory.dataset_name(
+            "train", N_TRAIN, RESOLUTION, DISJOINT_INTERVALS)),
+        N_TRAIN, train_cfg, SEED, **common)
 
     print(f"── TEST: {N_TEST} devices " + "─" * 41)
     # A different seed stream, so the two splits never line up device for
     # device on the capacitance entries that are NOT split.
-    generate(os.path.join(OUT_ROOT, f"ml_test_{tag}_n{N_TEST}_res{RESOLUTION}"),
-             N_TEST, test_cfg, SEED + 1000)
+    device_factory.generate(
+        paths.training_data(device_factory.dataset_name(
+            "test", N_TEST, RESOLUTION, DISJOINT_INTERVALS)),
+        N_TEST, test_cfg, SEED + 1000, **common)
 
-    print("next:  python run_budget_sweep.py")
+    print("next:  python run_experiment.py")
 
 
 if __name__ == "__main__":
