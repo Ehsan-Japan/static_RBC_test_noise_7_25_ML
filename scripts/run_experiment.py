@@ -114,8 +114,8 @@ KEEP_IMAGES = False
 # Every combination of these is trained and scored, so this is
 # len(RAYS) x len(POINTS) full trainings.  Start small, widen once the shape
 # of the curve is clear.
-RAYS = [8]
-POINTS = [50]
+RAYS = [10]
+POINTS = [70]
 
 
 # RAYS = [2, 4, 6, 8, 12]
@@ -148,7 +148,7 @@ N_EXAMPLES = 3
 SAVE_SAMPLE_ANALYSIS = True
 
 # Sweep GIFs are the slowest part of that analysis; 100 dpi keeps them cheap.
-SAVE_GIFS = True
+SAVE_GIFS = False
 GIF_DPI = 100
 
 # ══════════════════════════════════════════════════════════════════════
