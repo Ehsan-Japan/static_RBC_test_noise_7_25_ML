@@ -3,7 +3,7 @@
 The published baselines apply 2D networks to full charge stability diagrams.
 This module is the ray-native counterpart: a ~30k-parameter **1D CNN** that
 marks charge transitions along a single measured ray. It replaces the
-threshold-based peak detector — the noise-sensitive stage of the pipeline —
+threshold-based peak detector — the brittlest stage of the pipeline —
 while everything downstream (line fitting, honeycomb pairing, evaluation)
 stays geometric and interpretable.
 
@@ -11,7 +11,7 @@ stays geometric and interpretable.
 
 | file | what |
 |---|---|
-| `ray_dataset.py` | labeled ray traces: cut from finished `sample_*` folders (noisy sensor grid + simulator ground truth), or fully synthetic |
+| `ray_dataset.py` | labeled ray traces: cut from finished `sample_*` folders (sensor grid + simulator ground truth), or fully synthetic |
 | `model.py` | `RayTransitionNet` — dilated 1D convs, fully convolutional (any ray length), 2 input channels: trace + derivative |
 | `train.py` | training CLI, saves best-validation checkpoint to `weights/ray_cnn.pt` |
 | `detector.py` | `MLRayDetector` — `probability(trace)` and `detect(trace)` (peak indices), drop-in for the classical detector |
@@ -34,7 +34,7 @@ Result on held-out synthetic rays (tol = 3 points):
 
 ## Real workflow (train on your own runs)
 
-Every run you already generated is free training data — the noisy sensor
+Every run you already generated is free training data — the sensor
 grid provides the traces, `double_dot_data.npy` provides the labels:
 
 ```bash
@@ -42,8 +42,9 @@ python -m dqd.ml.train    --run-dir training_data/num_40_rays_6_res_100_image_re
 python -m dqd.ml.evaluate --run-dir training_data/<a DIFFERENT run>   # held-out!
 ```
 
-Evaluate on a run the model never trained on, ideally with different noise
-amplitude — that cross-noise generalization is itself a paper figure.
+Evaluate on a run the model never trained on, ideally one whose capacitance
+intervals do not overlap the training ones (see `train_test_config.py`) —
+that generalization to unseen device geometry is itself a paper figure.
 
 ## Using it in the pipeline
 

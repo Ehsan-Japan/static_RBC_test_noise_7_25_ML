@@ -46,7 +46,6 @@ class DatasetPipeline:
     vy_min / vy_max      : voltage range for the y (P2) axis
     coulomb_peak_width   : Lorentzian width of Coulomb peaks in the simulator
     temperature          : electron temperature used by the simulator
-    noise_std            : white-noise standard deviation added to the sensor output
     plot_dpi             : DPI for all saved figures
     save_gifs            : whether to save sweep-animation GIFs per peak
     gif_dpi              : resolution of those GIFs; the dominant cost of a
@@ -60,6 +59,11 @@ class DatasetPipeline:
     y_axis_unit          : unit shown after the y-axis name, e.g. "mV"
     figure_width_in      : canvas width of every saved figure, in inches
     figure_height_in     : canvas height of every saved figure, in inches
+    use_ml_detector      : use the learned 1D CNN (dqd.ml) instead of the
+                           three-point local-maximum rule to find the peak in
+                           each swept row.  Requires torch and a checkpoint.
+    ml_weights           : checkpoint path; defaults to src/dqd/ml/weights/ray_cnn.pt
+    ml_threshold         : probability above which a point counts as a transition
     """
 
     def __init__(
@@ -78,7 +82,6 @@ class DatasetPipeline:
         vy_max: float = 1.0,
         coulomb_peak_width: float = 0.01,
         temperature: float = 0.00001,
-        noise_std: float = 0.01,
         plot_dpi: int = 300,
         save_gifs: bool = True,
         gif_dpi: int = 150,
@@ -94,6 +97,10 @@ class DatasetPipeline:
         figure_height_in: float = 12.0,
         # ── Evaluation hyperparameters ────────────────────────────────
         peak_neighbor_cols: int = 0,
+        # ── Learned peak detector (dqd.ml) ────────────────────────────
+        use_ml_detector: bool = False,
+        ml_weights: Optional[str] = None,
+        ml_threshold: float = 0.5,
     ):
         self.base_save_dir = base_save_dir
         self.n_samples = n_samples
@@ -113,7 +120,6 @@ class DatasetPipeline:
         }
         self.coulomb_peak_width = coulomb_peak_width
         self.temperature = temperature
-        self.noise_std = noise_std
         self.plot_dpi = plot_dpi
         self.save_gifs = save_gifs
         self.gif_dpi = gif_dpi
@@ -136,6 +142,16 @@ class DatasetPipeline:
         )
         self.angles = np.linspace(0, 90, num_angles + 2)[1:-1]
         self.peak_neighbor_cols = peak_neighbor_cols
+
+        # Learned detector.  Built once here (loading the checkpoint per peak
+        # would dominate the run) and imported lazily, so torch stays an
+        # optional dependency for anyone running the classical pipeline.
+        self.ml_detector = None
+        if use_ml_detector:
+            from ..ml.detector import MLRayDetector, DEFAULT_WEIGHTS
+            weights = ml_weights or DEFAULT_WEIGHTS
+            self.ml_detector = MLRayDetector(weights, threshold=ml_threshold)
+            print(f"[DatasetPipeline] learned peak detector: {weights}")
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -191,7 +207,6 @@ class DatasetPipeline:
             "ylabel": y_label(),
             "voltage_sweep": vs,
             "optimal_Vg": [0.0, 0.0, 0.0],
-            "noise_params": {"std": self.noise_std},
             "plot_options": {
                 "charge_sensing_save_path": os.path.join(
                     sample_dir, "charge_sensing.jpg"
@@ -576,7 +591,8 @@ class DatasetPipeline:
             "global_pixel_y": global_pixel_y,
         }
 
-        detector = PeakDetector(output_dir=peak_folder)
+        detector = PeakDetector(output_dir=peak_folder,
+                                ml_detector=self.ml_detector)
         detector.run(data_path=cropped_path, hyperparams=analysis_params)
 
         # Gather every GIF of this peak into <sample>/gifs/ as well, so all the

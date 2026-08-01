@@ -101,7 +101,7 @@ pdf.cell(0, 10, "Program Structure & How It Works", align="C", new_x="LMARGIN", 
 pdf.ln(5)
 pdf.set_font("Helvetica", size=11)
 pdf.set_text_color(100, 100, 100)
-pdf.cell(0, 8, "Project: static_RBC_test_noise_3_17", align="C", new_x="LMARGIN", new_y="NEXT")
+pdf.cell(0, 8, "Project: static_RBC", align="C", new_x="LMARGIN", new_y="NEXT")
 pdf.ln(25)
 
 pdf.set_font("Helvetica", size=10)
@@ -138,7 +138,7 @@ pdf.body(
 pdf.section_title("Goal of the Pipeline")
 pdf.bullet([
     "Generate many randomized DQD simulations (each with different capacitance parameters).",
-    "Compute charge-sensing output + add realistic noise.",
+    "Compute charge-sensing output.",
     "Detect peaks (charge transitions) along rays swept at different angles.",
     "Crop regions around detected peaks and run detailed sweep analysis.",
     "Produce binary ground-truth labels and annotated images for ML training.",
@@ -155,8 +155,7 @@ pdf.code_block([
     "    x_resolution=100,     # voltage grid size (100x100)",
     "    y_resolution=100,",
     "    crop_size=2.0,        # mV half-width around each peak",
-    "    noise_std=0.01,       # white noise added to sensor",
-    ")",
+        ")",
     "pipeline.run()",
 ])
 
@@ -169,7 +168,6 @@ pdf.two_col_table(
         ["ray_resolution", "How many voltage points are sampled along each ray"],
         ["x_resolution / y_resolution", "Grid size of the full stability diagram (e.g. 100x100)"],
         ["crop_size", "Half-width (mV) of the square cropped around each detected peak"],
-        ["noise_std", "Standard deviation of Gaussian white noise added to charge sensor"],
         ["voltage_sweep", "Voltage range for Vx and Vy axes (default +/-1 V)"],
     ],
     col_widths=[55, 125],
@@ -235,13 +233,12 @@ steps = [
      "It sweeps the gate voltages Vx and Vy over a 100x100 grid (or your chosen resolution) "
      "in the range +/-1 V. It computes:\n"
      "  - charge_sensing_data.npy  (raw charge sensor current)\n"
-     "  - charge_sensing_noisy_z_data.npy  (same + white Gaussian noise)\n"
      "  - charge_sensing_grad_data.npy  (gradient of the above)\n"
      "  - double_dot_data.npy  (direct double-dot stability diagram)\n"
      "It also saves .jpg images and a hyperparameters.json file."),
 
     ("Step 3 - Ray Processing",
-     "RayProcessor loads the noisy charge-sensing .npy file. It fires num_angles rays "
+     "RayProcessor loads the charge-sensing .npy file. It fires num_angles rays "
      "starting from the corner (max_x, max_y), each pointing inward at a different angle "
      "between 0° and 90°. Along each ray it samples ray_resolution points and calls "
      "scipy.signal.find_peaks to locate charge-transition peaks. Results are saved as "
@@ -303,7 +300,6 @@ pdf.code_block([
     "    numpy/",
     "      simulation/",
     "        charge_sensing_data.npy",
-    "        charge_sensing_noisy_z_data.npy",
     "        charge_sensing_grad_data.npy",
     "        double_dot_data.npy",
     "        ground_truth_labels.npy    <- binary local-maxima label array",
@@ -375,11 +371,11 @@ classes = [
     ("DatasetPipeline", "pipeline/dataset_pipeline.py",
      "Master controller. Loops over N samples. Calls all other classes in order. "
      "Constructor takes: base_save_dir, n_samples, num_angles, ray_resolution, "
-     "x_resolution, y_resolution, crop_size, noise_std, voltage_sweep, config."),
+     "x_resolution, y_resolution, crop_size, voltage_sweep, config."),
 
     ("DQDSimulator", "simulation/dqd_simulator.py",
      "Physics engine. Receives params dict with capacitance matrices, voltage sweep, "
-     "model params, and noise settings. Calls qarray internally. Method: run()."),
+     "and model params. Calls qarray internally. Method: run()."),
 
     ("CapacitanceMatrixGenerator", "simulation/matrix_generator.py",
      "Randomly samples capacitance values. Methods: generate_symmetric() for Cdd, "
@@ -480,7 +476,6 @@ diagram = [
     "         |",
     "         +--> DQDSimulator.run()          --> charge_sensing_data.npy",
     "         |                                    double_dot_data.npy",
-    "         |                                    noisy_z_data.npy",
     "         |",
     "         +--> RayProcessor.run()          --> peaks.json",
     "         |                                    peaks_paired.json",

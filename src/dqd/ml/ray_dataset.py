@@ -9,13 +9,13 @@ along a straight line in (P1, P2) voltage space, plus a 0/1 label per point
 Two sources, same output format:
 
   1. rays_from_sample()  — the real thing.  Cuts random rays through the
-     noisy sensor grid of a FINISHED sample folder and labels every ray point
+     sensor grid of a FINISHED sample folder and labels every ray point
      from the ground-truth transition map the simulator saved
      (double_dot_data.npy).  Training data therefore costs nothing new: every
      run you already generated becomes ray training data.
 
   2. synthetic_rays()    — a fast standalone generator (logistic steps at
-     random positions + drift + white noise).  Used for pretraining and for
+     random positions + drift).  Used for pretraining and for
      testing this module without any sample folders.
 
 Both return
@@ -70,7 +70,7 @@ def rays_from_sample(sample_dir: str,
                      rng: Optional[np.random.Generator] = None,
                      ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Random rays through one sample's NOISY sensor grid, labeled from the
+    Random rays through one sample's sensor grid, labeled from the
     simulator's ground-truth transition map.
 
     Parameters
@@ -84,7 +84,7 @@ def rays_from_sample(sample_dir: str,
     """
     rng = rng or np.random.default_rng()
     sim = os.path.join(sample_dir, "numpy", "simulation")
-    ux, uy, Z = _load_grid(os.path.join(sim, "charge_sensing_noisy_z_data.npy"))
+    ux, uy, Z = _load_grid(os.path.join(sim, "charge_sensing_data.npy"))
     gx, gy, G = _load_grid(os.path.join(sim, "double_dot_data.npy"))
 
     # ground-truth transition cell centres and labeling radius in volts
@@ -123,7 +123,7 @@ def rays_from_run(run_dir: str, rays_per_sample: int = 200,
     for name in sorted(os.listdir(run_dir)):
         sdir = os.path.join(run_dir, name)
         need = os.path.join(sdir, "numpy", "simulation",
-                            "charge_sensing_noisy_z_data.npy")
+                            "charge_sensing_data.npy")
         if name.startswith("sample_") and os.path.isfile(need):
             x, y = rays_from_sample(sdir, rays_per_sample, n_points,
                                     rng=rng, **kw)
@@ -138,13 +138,14 @@ def rays_from_run(run_dir: str, rays_per_sample: int = 200,
 # ----------------------------------------------------------------------
 
 def synthetic_rays(n_rays: int = 2000, n_points: int = 128,
-                   noise: Tuple[float, float] = (0.02, 0.4),
                    seed: int = 0) -> Tuple[np.ndarray, np.ndarray]:
     """
     Charge-sensing-like traces: a few logistic steps of random sign, height,
-    width and position, a slow background drift, and white noise of random
-    amplitude.  Labels mark points within 2 transition-widths of each step
-    centre.  Mimics what a ray sees when it crosses dot-to-lead lines.
+    width and position, plus a slow background drift.  Labels mark points
+    within 2 transition-widths of each step centre.  Mimics what a ray sees
+    when it crosses dot-to-lead lines.
+
+    The traces are clean, matching the noiseless simulator.
     """
     rng = np.random.default_rng(seed)
     t = np.linspace(0.0, 1.0, n_points)
@@ -159,7 +160,6 @@ def synthetic_rays(n_rays: int = 2000, n_points: int = 128,
             h = rng.uniform(0.3, 1.5) * rng.choice([-1, 1])
             z = z + h / (1.0 + np.exp(-(t - c) / w))
             Y[k, np.abs(t - c) < 2 * w] = 1.0
-        z = z + rng.normal(0, rng.uniform(*noise), n_points)
         X[k] = z
     return _zscore(X), Y
 

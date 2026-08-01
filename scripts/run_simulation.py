@@ -58,7 +58,6 @@ def main():
         # ── Simulator physics ─────────────────────────────────────────
         coulomb_peak_width=0.01,
         temperature=0.00001,
-        noise_std=0.01,
 
         # ── Output options ────────────────────────────────────────────
         plot_dpi=300,
@@ -77,6 +76,17 @@ def main():
 
         # ── Evaluation ────────────────────────────────────────────────
         peak_neighbor_cols=2,
+
+        # ── Learned peak detector (src/dqd/ml) ────────────────────────
+        # False: each swept row stops at the first three-point local maximum
+        # (the classical rule).  True: the 1D CNN in dqd.ml
+        # decides instead, judging the trace measured so far — same partial
+        # measurement, learned decision.  Needs torch and a trained
+        # checkpoint at src/dqd/ml/weights/ray_cnn.pt (train it with
+        # `cd src && python -m dqd.ml.train --run-dir training_data/<a run>`).
+        use_ml_detector=False,
+        # ml_weights="src/dqd/ml/weights/ray_cnn.pt",   # override the default
+        ml_threshold=0.5,
     )
     pipeline.run()
 

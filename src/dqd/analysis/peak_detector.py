@@ -52,6 +52,10 @@ class PeakDetector:
                     from scratch, so this is the main cost driver: 150 dpi
                     is ~230 ms/frame and ~2.4 MB per GIF, 100 dpi is
                     ~190 ms/frame and ~0.75 MB.
+    ml_detector   : optional learned detector (dqd.ml.MLRayDetector, or any
+                    object with detect(trace) -> indices).  When given it
+                    replaces the three-point local-maximum rule inside a row
+                    scan; see _scan_row.  None keeps the classical detector.
     """
 
     def __init__(
@@ -64,6 +68,7 @@ class PeakDetector:
         scanned_voltages: Optional[List[Tuple[float, float]]] = None,
         threshold: float = 0.05,
         gif_dpi: int = 150,
+        ml_detector: Optional[object] = None,
     ):
         self.output_dir = output_dir
         self.save_plots = save_plots
@@ -73,6 +78,7 @@ class PeakDetector:
         self.scanned_voltages = scanned_voltages or []
         self.threshold = threshold
         self.gif_dpi = gif_dpi
+        self.ml_detector = ml_detector
 
     # ------------------------------------------------------------------
     # Public API
@@ -114,6 +120,8 @@ class PeakDetector:
             raise ValueError(f"Grid mismatch: {num_Vx}×{num_Vy} ≠ {len(Current)}")
         current_2d = Current.reshape((num_Vy, num_Vx))
 
+        if "ml_detector" in hyperparams:
+            self.ml_detector = hyperparams["ml_detector"]
         col_buffer = hyperparams.get("col_buffer", self.col_buffer)
         scanned_voltages = hyperparams.get("scanned_voltages", self.scanned_voltages)
         threshold = hyperparams.get("threshold", self.threshold)
@@ -217,6 +225,11 @@ class PeakDetector:
 
         return peaks, states
 
+    # Shortest partial trace the learned detector is asked about.  Below this
+    # the z-scoring in MLRayDetector divides by a near-zero spread and the
+    # dilated receptive field sees almost nothing, so the answer means little.
+    _ML_MIN_POINTS = 8
+
     def _scan_row(self, row_data, start_col, col_step,
                   unique_Vx, unique_Vy, row_index, scanned_voltages, threshold):
         scanned_cols, measured_vals = [], []
@@ -242,8 +255,23 @@ class PeakDetector:
             scanned_cols.append(c)
             measured_vals.append(row_data[c])
 
+            if self.ml_detector is not None:
+                # Learned detector, run on the trace measured SO FAR.  The
+                # sweep is a partial measurement — it stops at the first
+                # transition and never sees the rest of the row — so the
+                # network is only ever shown the points already acquired,
+                # exactly like the three-point rule below.  A candidate is
+                # accepted only once at least one further point has been
+                # measured past it, so a detection on the leading edge of the
+                # trace cannot stop the scan before the peak is bracketed.
+                if len(measured_vals) >= self._ML_MIN_POINTS:
+                    idx = self.ml_detector.detect(measured_vals)
+                    confirmed = [k for k in idx if k <= len(measured_vals) - 2]
+                    if confirmed:
+                        peak_col = scanned_cols[confirmed[0]]
+                        break
             # Local-maximum check (three-point)
-            if len(measured_vals) >= 3:
+            elif len(measured_vals) >= 3:
                 if measured_vals[-2] > measured_vals[-3] and measured_vals[-2] > measured_vals[-1]:
                     peak_col = scanned_cols[-2]
                     break

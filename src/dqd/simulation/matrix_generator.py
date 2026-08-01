@@ -14,6 +14,12 @@ class CapacitanceMatrixGenerator:
 
     def __init__(self, seed: Optional[int] = None):
         self.seed = seed
+        # ONE stream for the whole lifetime of the generator.  Each generate_*
+        # call used to build its own random.Random(self.seed): with a seed set
+        # that made every matrix and every sample identical, so a seeded run
+        # produced N copies of one device.  Reuse one stream and a seed means
+        # what it should — reproducible, but still varied.
+        self._rng = random.Random(seed)
 
     # ------------------------------------------------------------------
     # Public API
@@ -35,7 +41,7 @@ class CapacitanceMatrixGenerator:
         size      : int   side length of the square matrix
         labels    : list  size×size label grid (upper triangle mirrors lower)
         """
-        rng = random.Random(self.seed)
+        rng = self._rng
         matrix = [[0.0] * size for _ in range(size)]
         for i in range(size):
             for j in range(i, size):
@@ -60,7 +66,7 @@ class CapacitanceMatrixGenerator:
         shape     : [rows, cols]
         labels    : list       rows×cols label grid
         """
-        rng = random.Random(self.seed)
+        rng = self._rng
         rows, cols = shape
         matrix = [[0.0] * cols for _ in range(rows)]
         for i in range(rows):

@@ -234,7 +234,7 @@ def _no_legend_path(path: str) -> Optional[str]:
 
     Only sample-level figures qualify: the sample root itself and one level
     below it (images/), never the per-peak cropped_results tree.  Names from a
-    sub-directory are flattened ("images/noisy_z.jpg" -> "images__noisy_z.jpg")
+    sub-directory are flattened ("images/a.jpg" -> "images__a.jpg")
     so nothing collides in the single output folder.
     """
     if not _NO_LEGEND_DIR:

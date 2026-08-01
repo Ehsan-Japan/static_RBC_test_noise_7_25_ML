@@ -24,7 +24,6 @@ class Sample:
         "double_dot_data.npy",
         "charge_sensing_data.npy",
         "charge_sensing_grad_data.npy",
-        "charge_sensing_noisy_z_data.npy",
     ]
 
     # Image files that must be moved into images/

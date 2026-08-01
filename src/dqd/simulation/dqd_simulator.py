@@ -1,6 +1,9 @@
 """
-DQDSimulator — runs a charge-sensing DQD simulation, optionally adds white
-noise, and saves all outputs.  Absorbs the old simulation.py + preprocessing.py.
+DQDSimulator — runs a charge-sensing DQD simulation and saves all outputs.
+Absorbs the old simulation.py + preprocessing.py.
+
+The simulation is noiseless: qarray's noise model is set to NoNoise and
+nothing is added to the sensor output afterwards.
 """
 import os
 import numpy as np
@@ -51,7 +54,7 @@ class DQDSimulator:
     params : dict
         Must contain:
           save_dir, capacitance, model_params, xlabel, ylabel,
-          voltage_sweep, plot_options, noise_params (optional)
+          voltage_sweep, plot_options
     """
 
     def __init__(self, params: Dict):
@@ -99,7 +102,6 @@ class DQDSimulator:
         # Output numpy paths
         npy_z = os.path.join(os.path.dirname(cs_save), "charge_sensing_data.npy")
         npy_dz = os.path.join(os.path.dirname(cs_save), "charge_sensing_grad_data.npy")
-        npy_noisy = os.path.join(os.path.dirname(cs_save), "charge_sensing_noisy_z_data.npy")
 
         # hyperparameters.json is written by DatasetPipeline (which knows the
         # analysis hyperparameters too), not here.
@@ -123,36 +125,22 @@ class DQDSimulator:
         z, _ = model.charge_sensor_open(vg)
         dz = np.gradient(z, axis=0) + np.gradient(z, axis=1)
 
-        # Add optional white noise
-        noise_p = p.get("noise_params", {})
-        white_amp = noise_p.get("white_amplitude", 0.0)
-        white_mean = noise_p.get("white_mean", 0.0)
-        white_seed = noise_p.get("white_seed", None)
-
-        if white_amp > 0:
-            if white_seed is not None:
-                np.random.seed(white_seed)
-            noisy_z = z + np.random.normal(loc=white_mean, scale=white_amp, size=z.shape)
-        else:
-            noisy_z = z.copy()
-
-        # Save noisy-z plot
-        noisy_plot = os.path.join(self.save_dir, "images", "noisy_z_output.jpg")
+        # Sensor-output map
+        z_plot = os.path.join(self.save_dir, "images", "charge_sensor_output.jpg")
         fig, ax, cax = new_map_figure(with_colorbar=True)
-        im = ax.imshow(noisy_z, extent=[vx_min, vx_max, vy_min, vy_max],
+        im = ax.imshow(z, extent=[vx_min, vx_max, vy_min, vy_max],
                        origin="lower", aspect="auto", cmap="hot")
         apply_voltage_axes(ax, vx_min, vx_max, vy_min, vy_max)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
-        ax.set_title("Charge Sensor Output with Additional White Noise")
+        ax.set_title("Charge Sensor Output")
         fig.colorbar(im, cax=cax)
-        save_figure(fig, noisy_plot, dpi=dpi)
+        save_figure(fig, z_plot, dpi=dpi)
 
         # Flatten and stack
         Vx_f, Vy_f = Vx.flatten(), Vy.flatten()
         np.save(npy_z, np.stack((Vx_f, Vy_f, z.flatten()), axis=-1))
         np.save(npy_dz, np.stack((Vx_f, Vy_f, dz.flatten()), axis=-1))
-        np.save(npy_noisy, np.stack((Vx_f, Vy_f, noisy_z.flatten()), axis=-1))
 
         # Save side-by-side charge-sensing plot
         fig, axes = plt.subplots(1, 2, sharex=True, sharey=True,
