@@ -75,7 +75,7 @@ from make_figures import fig_budget_coverage, fig_budget_rays, fig_examples
 # the order of a thousand training devices before the numbers mean anything.
 # At ~0.7 s/device, 2000 + 500 is about half an hour — paid once, then reused
 # by every later run with the same settings.
-N_TRAIN = 50
+N_TRAIN = 60
 N_TEST = 5
 
 # Stability-diagram side length in pixels.  Fixes the network's input size,
@@ -107,8 +107,8 @@ KEEP_IMAGES = False
 # Every combination of these is trained and scored, so this is
 # len(RAYS) x len(POINTS) full trainings.  Start small, widen once the shape
 # of the curve is clear.
-RAYS = [4, 7]
-POINTS = [80]
+RAYS = [8]
+POINTS = [50]
 
 
 # RAYS = [2, 4, 6, 8, 12]
