@@ -19,6 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from dqd.config import paths
 from dqd.ml import grid_dataset, grid_train, run_dir
 from dqd.ml.grid_metrics import evaluate
 
@@ -30,8 +31,8 @@ def main():
     #  SETTINGS
     # ══════════════════════════════════════════════════════════════════
 
-    TRAIN_DIR = os.path.join("..", "training_data", "ml_train_split_n2000_res100")
-    TEST_DIR = os.path.join("..", "training_data", "ml_test_split_n500_res100")
+    TRAIN_DIR = paths.training_data("ml_train_split_n2000_res100")
+    TEST_DIR = paths.training_data("ml_test_split_n500_res100")
 
     # Training-set sizes to try.  Sizes larger than the folder are skipped.
     SIZES = [50, 100, 200, 500, 1000, 2000]

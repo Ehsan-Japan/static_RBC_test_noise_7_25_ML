@@ -38,8 +38,8 @@ Every run you already generated is free training data — the sensor
 grid provides the traces, `double_dot_data.npy` provides the labels:
 
 ```bash
-python -m dqd.ml.train    --run-dir training_data/num_40_rays_6_res_100_image_res_100
-python -m dqd.ml.evaluate --run-dir training_data/<a DIFFERENT run>   # held-out!
+python -m dqd.ml.train    --run-dir ../training_data/num_40_rays_6_res_100_image_res_100
+python -m dqd.ml.evaluate --run-dir ../training_data/<a DIFFERENT run>   # held-out!
 ```
 
 Evaluate on a run the model never trained on, ideally one whose capacitance

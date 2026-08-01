@@ -20,19 +20,21 @@ Usage:
 
 import os
 import re
+import sys
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from dqd.config import paths                                    # noqa: E402
+
 # ── Config ────────────────────────────────────────────────────────────────────
-DATA_DIR = os.path.join(
-    os.path.dirname(__file__), "..",
-    "training_data",
-    "num_1800_rays_6_res_100_image_res_100",
-)
+DATA_DIR   = paths.training_data("num_1800_rays_6_res_100_image_res_100")
 N_SAMPLES  = 100
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "results")
+OUTPUT_DIR = paths.RESULTS
 
 # ── Parsing ───────────────────────────────────────────────────────────────────
 

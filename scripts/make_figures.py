@@ -36,6 +36,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from dqd.config import paths
 from dqd.ml import grid_dataset, grid_train, run_dir
 
 # ── Palette ───────────────────────────────────────────────────────────
@@ -274,7 +275,7 @@ def main():
     DATA_SIZE_CSV = None
     MODEL_PATH = None
 
-    TEST_DIR = os.path.join("..", "training_data", "ml_test_split_n500_res100")
+    TEST_DIR = paths.training_data("ml_test_split_n500_res100")
     N_EXAMPLES = 3
 
     # ══════════════════════════════════════════════════════════════════

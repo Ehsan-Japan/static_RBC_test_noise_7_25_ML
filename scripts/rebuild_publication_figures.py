@@ -13,8 +13,8 @@ Usage
     python scripts/rebuild_publication_figures.py <path>
 
 <path> may be a single sample_* folder, a dataset folder containing sample_*
-folders, or training_data/ itself.  With no argument every sample under
-training_data/ is rebuilt.
+folders, or the project's training_data/ itself.  With no argument every
+sample under <project>/training_data/ is rebuilt.
 """
 import os
 import re
@@ -26,6 +26,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "src"))
 
+from dqd.config import paths                                   # noqa: E402
 from dqd.visualization.overlay import OverlayRenderer          # noqa: E402
 
 # Same styling the pipeline uses for the publication figures.
@@ -99,7 +100,7 @@ def _collect_samples(path: str):
 
 
 def main() -> None:
-    target = sys.argv[1] if len(sys.argv) > 1 else "training_data"
+    target = sys.argv[1] if len(sys.argv) > 1 else paths.TRAINING_DATA
     samples = _collect_samples(target)
     print(f"Rebuilding under {os.path.abspath(target)}")
     if not samples:

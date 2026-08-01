@@ -3,7 +3,7 @@ evaluate.py — score the ML detector against a classical gradient-threshold
 baseline on held-out rays, at the PEAK level (what the pipeline consumes).
 
     python -m dqd.ml.evaluate --synthetic 1000
-    python -m dqd.ml.evaluate --run-dir training_data/...   [--weights path]
+    python -m dqd.ml.evaluate --run-dir ../training_data/...   (run from src/)   [--weights path]
 
 A predicted peak counts as a true positive if it lands within `--tol` points
 of a ground-truth transition centre (each truth centre matched at most once).

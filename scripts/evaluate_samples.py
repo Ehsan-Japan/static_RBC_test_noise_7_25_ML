@@ -30,12 +30,13 @@ Usage:
 
 import os
 import re
+import sys
 
-DATA_DIR = os.path.join(
-    os.path.dirname(__file__), "..",
-    "training_data",
-    "num_30_rays_6_res_100_image_res_100",
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from dqd.config import paths                                    # noqa: E402
+
+DATA_DIR = paths.training_data("num_30_rays_6_res_100_image_res_100")
 N_SAMPLES = 30
 
 

@@ -43,6 +43,8 @@ DQD Simulation Pipeline — Program Structure_files/
 # --- Generated / large data & results (reproducible from code) ---
 /data/
 /training_data/
+/runs/
+/grid_cache/
 /results/
 /archive/
 

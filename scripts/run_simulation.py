@@ -4,12 +4,14 @@ import sys
 # Allow running from the repo root without installing the package
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from dqd.config import paths
 from dqd.pipeline.dataset_pipeline import DatasetPipeline
 
 def main():
     pipeline = DatasetPipeline(
         # ── Output ────────────────────────────────────────────────────
-        base_save_dir="training_data",
+        # <project>/training_data/, wherever this is started from.
+        base_save_dir=paths.TRAINING_DATA,
 
         # ── Axis labels ───────────────────────────────────────────────
         # Names and units of the two gate axes.  Set here ONCE: every figure
@@ -83,7 +85,7 @@ def main():
         # decides instead, judging the trace measured so far — same partial
         # measurement, learned decision.  Needs torch and a trained
         # checkpoint at src/dqd/ml/weights/ray_cnn.pt (train it with
-        # `cd src && python -m dqd.ml.train --run-dir training_data/<a run>`).
+        # `cd src && python -m dqd.ml.train --run-dir ../training_data/<a run>`).
         use_ml_detector=False,
         # ml_weights="src/dqd/ml/weights/ray_cnn.pt",   # override the default
         ml_threshold=0.5,

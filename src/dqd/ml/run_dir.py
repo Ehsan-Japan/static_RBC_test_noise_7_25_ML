@@ -29,8 +29,13 @@ import os
 from datetime import datetime
 from typing import Dict, Optional
 
-RUNS_ROOT = os.path.join("..", "runs")
-SHARED_CACHE = os.path.join("..", "grid_cache")
+from dqd.config import paths
+
+# Both live inside the project, next to training_data/, and are absolute — a
+# run started from scripts/ and one started from the project root write to the
+# same place (dqd/config/paths.py).
+RUNS_ROOT = paths.RUNS_ROOT
+SHARED_CACHE = paths.GRID_CACHE
 
 
 def new_run(kind: str, settings: Optional[Dict] = None,

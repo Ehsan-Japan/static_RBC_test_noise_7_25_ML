@@ -171,7 +171,8 @@ def synthetic_rays(n_rays: int = 2000, n_points: int = 128,
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--run-dir", help="training_data run with sample_* folders")
+    ap.add_argument("--run-dir", help="training_data run with sample_* folders "
+                    "(<project>/training_data/<run>)")
     ap.add_argument("--synthetic", type=int, default=0,
                     help="number of synthetic rays instead of --run-dir")
     ap.add_argument("--rays-per-sample", type=int, default=200)

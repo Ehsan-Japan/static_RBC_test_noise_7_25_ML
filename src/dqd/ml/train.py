@@ -2,7 +2,7 @@
 train.py — train RayTransitionNet on labeled ray traces.
 
     # from a run of finished sample folders (the real workflow)
-    python -m dqd.ml.train --run-dir training_data/num_40_rays_6_res_100_image_res_100
+    python -m dqd.ml.train --run-dir ../training_data/num_40_rays_6_res_100_image_res_100
 
     # or purely synthetic (smoke test / pretraining, no data needed)
     python -m dqd.ml.train --synthetic 4000

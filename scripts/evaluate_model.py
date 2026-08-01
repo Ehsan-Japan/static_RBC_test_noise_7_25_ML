@@ -23,6 +23,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from dqd.config import paths
 from dqd.ml import grid_dataset, grid_train, run_dir
 from dqd.ml.grid_baseline import score_hough
 from dqd.ml.grid_metrics import evaluate
@@ -39,7 +40,7 @@ def main():
     # ══════════════════════════════════════════════════════════════════
 
     # Devices to score on.  Must NOT be the ones the checkpoint trained on.
-    TEST_DIR = os.path.join("..", "training_data", "ml_test_split_n500_res100")
+    TEST_DIR = paths.training_data("ml_test_split_n500_res100")
 
     # The checkpoint to score.  None = the newest one any run has produced,
     # so you rarely have to paste a path; set it explicitly to score an
