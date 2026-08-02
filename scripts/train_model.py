@@ -30,6 +30,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from dqd.config import paths
 from dqd.ml import grid_dataset, grid_train, run_dir
 
+# The loss figures are make_figures.py's own; scripts/ is on sys.path when
+# this program is run directly, so a sibling import is enough.
+from make_figures import loss_entry, save_loss_report
+
 
 def main():
     # ══════════════════════════════════════════════════════════════════
@@ -65,12 +69,17 @@ def main():
     X, Y = grid_dataset.build_cached(samples, N_RAYS, N_POINTS,
                                      cache_dir=run_dir.SHARED_CACHE,
                                      tag="train")
-    net, thr = grid_train.train(X, Y, epochs=EPOCHS)
+    net, thr, hist = grid_train.train(X, Y, epochs=EPOCHS)
 
     path = os.path.join(out, "models",
                         grid_train.checkpoint_name(N_RAYS, N_POINTS))
     grid_train.save(net, thr, path, N_RAYS, N_POINTS, extra={"n_train": len(X)})
     print(f"\nsaved {os.path.abspath(path)}   (threshold {thr})")
+
+    # The training curve and a models_info.json, into <run>/loss_curves/.
+    save_loss_report(out, [loss_entry(
+        hist, N_RAYS, N_POINTS, n_train=len(X), epochs=EPOCHS, threshold=thr,
+        net=net, checkpoint=os.path.basename(path))])
     print("now point MODEL_PATH in evaluate_model.py at that file and run it")
 
 

@@ -37,6 +37,10 @@ from dqd.ml import grid_dataset, grid_train, run_dir
 from dqd.ml.grid_baseline import score_hough
 from dqd.ml.grid_metrics import evaluate
 
+# The loss figures are make_figures.py's own; scripts/ is on sys.path when
+# this program is run directly, so a sibling import is enough.
+from make_figures import loss_entry, save_loss_report
+
 KEYS = ("f1@0", "f1@1", "f1@2", "f1@3", "iou")
 
 
@@ -77,7 +81,7 @@ def main():
 
     cache = run_dir.SHARED_CACHE
     out_csv = os.path.join(out, "budget_sweep.csv")
-    rows = []
+    rows, entries = [], []
 
     for R in RAYS:
         for P in POINTS:
@@ -87,12 +91,15 @@ def main():
             Xte, Yte = grid_dataset.build_cached(test_samples, R, P,
                                                  cache_dir=cache, tag="test")
 
-            net, thr = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
+            net, thr, hist = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
             ckpt = os.path.join(out, "models",
                                 grid_train.checkpoint_name(R, P))
             grid_train.save(net, thr, ckpt, R, P,
                             extra={"n_train": len(Xtr)})
             print(f"  saved {os.path.abspath(ckpt)}")
+            entries.append(loss_entry(
+                hist, R, P, n_train=len(Xtr), epochs=EPOCHS, threshold=thr,
+                net=net, checkpoint=os.path.basename(ckpt)))
 
             m = evaluate(grid_train.predict(net, Xte) > thr, Yte)
             h = score_hough(Xte, Yte)
@@ -114,6 +121,11 @@ def main():
                 w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
                 w.writeheader()
                 w.writerows(rows)
+
+    # One loss curve per budget plus all of them together, into
+    # <run>/loss_curves/, with models_info.json describing every model.
+    print("\ntraining-loss curves:")
+    save_loss_report(out, entries)
 
     print("\n" + "=" * 70)
     print("transition-line recovery vs measurement budget  (tolerant F1, tau=1)")

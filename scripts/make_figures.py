@@ -26,6 +26,7 @@ Figure conventions, applied everywhere so the set reads as one:
   * text is ink-coloured, never series-coloured; the legend carries identity.
 """
 import csv
+import json
 import os
 import sys
 
@@ -264,6 +265,112 @@ def fig_examples(test_dir, model_path, fig_dir, n_examples=3):
     _save(fig, "fig_examples.png", fig_dir)
 
 
+# ----------------------------------------------------------------------
+# Figure 5: training-loss curves — each model on its own, and all together
+# ----------------------------------------------------------------------
+#
+# Every training script collects a per-epoch history from grid_train.train()
+# and hands it here.  save_loss_report() writes, into <run>/loss_curves/ :
+#
+#     loss_<label>.png        one model's loss + validation F1 vs epoch
+#     loss_all_models.png     every model of the run on shared axes
+#     models_info.json        what each model was — budget, sizes, threshold,
+#                             best F1, and the full history (so these figures
+#                             can be re-drawn later without retraining)
+
+def loss_entry(history, n_rays, n_points, n_train, epochs, threshold,
+               net=None, label=None, **extra):
+    """
+    One model's record for save_loss_report().
+
+    label defaults to the checkpoint-style "rays<R>_points<P>"; pass one
+    explicitly when several models share a budget (the data-size sweep).
+    """
+    e = {"label": label or f"rays{n_rays}_points{n_points}",
+         "n_rays": int(n_rays), "n_points": int(n_points),
+         "n_train": int(n_train), "epochs": int(epochs),
+         "threshold": float(threshold),
+         "final_train_loss": float(history["train_loss"][-1]),
+         "min_train_loss": float(min(history["train_loss"])),
+         "best_val_f1": float(max(history["val_f1"])),
+         "history": {k: [float(v) for v in vs] for k, vs in history.items()},
+         **extra}
+    if net is not None:
+        e["n_params"] = int(net.n_params)
+    return e
+
+
+def _loss_colors(n):
+    """SERIES while it lasts; beyond three, a sequential ramp in model order."""
+    if n <= len(SERIES):
+        return list(SERIES[:n])
+    import matplotlib.colors as mcolors
+    return [mcolors.to_hex(c)
+            for c in plt.cm.viridis(np.linspace(0.10, 0.85, n))]
+
+
+def _loss_axes(title):
+    """Two stacked panels sharing the epoch axis — loss above, val F1 below.
+    Two panels, not two y-scales: one measured quantity per axis."""
+    fig, (ax_l, ax_f) = plt.subplots(2, 1, figsize=(6.0, 6.4), sharex=True)
+    _style(ax_l, "", "training loss", title)
+    _style(ax_f, "epoch", "validation F1  (tolerance 1 px)")
+    ax_f.set_ylim(0, 1)
+    return fig, ax_l, ax_f
+
+
+def fig_loss_model(entry, out_dir):
+    """One model's training curve: loss_<label>.png."""
+    h = entry["history"]
+    ep = np.arange(1, len(h["train_loss"]) + 1)
+    fig, ax_l, ax_f = _loss_axes(
+        f"Training curve — {entry['n_rays']} rays x "
+        f"{entry['n_points']} points")
+    ax_l.plot(ep, h["train_loss"], "-o", color=SERIES[0], linewidth=2,
+              markersize=4, markeredgecolor=SURFACE, markeredgewidth=1.0,
+              zorder=3)
+    ax_f.plot(ep, h["val_f1"], "-o", color=SERIES[2], linewidth=2,
+              markersize=4, markeredgecolor=SURFACE, markeredgewidth=1.0,
+              zorder=3)
+    best = int(np.argmax(h["val_f1"]))
+    ax_f.annotate(f"best {h['val_f1'][best]:.3f}", (ep[best], h["val_f1"][best]),
+                  textcoords="offset points", xytext=(0, 8), ha="center",
+                  fontsize=8, color=INK_2)
+    _save(fig, f"loss_{entry['label']}.png", out_dir)
+
+
+def fig_loss_all(entries, out_dir):
+    """Every model of the run on one pair of axes: loss_all_models.png."""
+    fig, ax_l, ax_f = _loss_axes("Training loss — all models")
+    for color, e in zip(_loss_colors(len(entries)), entries):
+        h = e["history"]
+        ep = np.arange(1, len(h["train_loss"]) + 1)
+        ax_l.plot(ep, h["train_loss"], "-", color=color, linewidth=2,
+                  label=e["label"], zorder=3)
+        ax_f.plot(ep, h["val_f1"], "-", color=color, linewidth=2, zorder=3)
+    ax_l.legend(frameon=False, fontsize=8, labelcolor=INK_2, loc="upper right")
+    _save(fig, "loss_all_models.png", out_dir)
+
+
+def save_loss_report(run, entries, subdir="loss_curves"):
+    """
+    models_info.json + all loss figures into <run>/<subdir>/.  Returns the
+    folder.  The json holds everything the figures are drawn from, so
+    make_figures.py can re-draw them for an old run without retraining.
+    """
+    out_dir = os.path.join(run, subdir)
+    os.makedirs(out_dir, exist_ok=True)
+    info = os.path.join(out_dir, "models_info.json")
+    with open(info, "w") as f:
+        json.dump(entries, f, indent=2, default=float)
+    print(f"  wrote {os.path.abspath(info)}")
+    for e in entries:
+        fig_loss_model(e, out_dir)
+    if len(entries) > 1:
+        fig_loss_all(entries, out_dir)
+    return out_dir
+
+
 def main():
     # ══════════════════════════════════════════════════════════════════
     #  SETTINGS
@@ -323,6 +430,15 @@ def main():
         fig_examples(TEST_DIR, model, fig_dir, N_EXAMPLES)
     else:
         print("  [skip] no checkpoint in runs/ — run train_model.py")
+
+    print("training-loss curves:")
+    info = run_dir.find_file(os.path.join("loss_curves", "models_info.json"))
+    if info:
+        with open(info) as f:
+            entries = json.load(f)
+        save_loss_report(os.path.dirname(os.path.dirname(info)), entries)
+    else:
+        print("  [skip] no loss_curves/models_info.json in runs/")
 
 
 if __name__ == "__main__":

@@ -22,6 +22,8 @@ WHERE THINGS GO — nothing an earlier run made is ever touched.
       budget_sweep.csv               the results
       models/                        one checkpoint per budget
       figures/                       for make_figures.py
+      loss_curves/                   training-loss curve per model, all models
+                                     together, and models_info.json
       sample_<i>/                    STAGE 4: the full per-device analysis of
                                      every test device (rays, peaks.json,
                                      summary*.png, cropped_results/, gifs/,
@@ -69,7 +71,8 @@ from dqd.simulation import device_factory
 
 # The figures, from the program that owns them.  scripts/ is on sys.path when
 # either program is run directly, so a sibling import is enough.
-from make_figures import fig_budget_coverage, fig_budget_rays, fig_examples
+from make_figures import (fig_budget_coverage, fig_budget_rays, fig_examples,
+                          loss_entry, save_loss_report)
 from render_test_sample_analysis import analyse_test_devices
 
 # ══════════════════════════════════════════════════════════════════════
@@ -114,7 +117,7 @@ KEEP_IMAGES = False
 # Every combination of these is trained and scored, so this is
 # len(RAYS) x len(POINTS) full trainings.  Start small, widen once the shape
 # of the curve is clear.
-RAYS = [5,6,7,8]
+RAYS = [5,6]
 POINTS = [100]
 
 
@@ -123,7 +126,7 @@ POINTS = [100]
 
 
 # Fewer epochs than train_model.py, because this runs many times over.
-EPOCHS = 40
+EPOCHS =10
 
 # Probability threshold that turns the model's per-pixel probabilities into
 # the binary line map.  None = pick automatically (the value maximising
@@ -234,7 +237,7 @@ def run_cell(out, train_samples, test_samples, n_rays, n_points):
     Xte, Yte = grid_dataset.build_cached(test_samples, n_rays, n_points,
                                          cache_dir=cache, tag="test")
 
-    net, thr = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
+    net, thr, hist = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
     if THRESHOLD is not None:
         thr = THRESHOLD               # manual override from the settings
     ckpt = os.path.join(out, "models",
@@ -243,6 +246,9 @@ def run_cell(out, train_samples, test_samples, n_rays, n_points):
                     extra={"n_train": len(Xtr)})
     print(f"  saved {os.path.abspath(ckpt)}")
 
+    entry = loss_entry(hist, n_rays, n_points, n_train=len(Xtr),
+                       epochs=EPOCHS, threshold=thr, net=net,
+                       checkpoint=os.path.basename(ckpt))
     m = evaluate(grid_train.predict(net, Xte) > thr, Yte)
     h = score_hough(Xte, Yte)
     return {"n_rays": n_rays, "n_points": n_points,
@@ -252,7 +258,7 @@ def run_cell(out, train_samples, test_samples, n_rays, n_points):
             "peak_frac": float(Xte[:, 2].mean()),
             "threshold": thr,
             **{f"ml_{k}": m[k] for k in KEYS},
-            **{f"hough_{k}": h[k] for k in KEYS}}
+            **{f"hough_{k}": h[k] for k in KEYS}}, entry
 
 
 def run_sweep(out, train_dir, test_dir):
@@ -267,20 +273,22 @@ def run_sweep(out, train_dir, test_dir):
           f"devices, {len(RAYS) * len(POINTS)} cells")
 
     out_csv = os.path.join(out, "budget_sweep.csv")
-    rows = []
+    rows, entries = [], []
     for n_rays in RAYS:
         for n_points in POINTS:
             print(f"\n=== STAGE 2  {n_rays} rays x {n_points} points "
                   + "=" * 30)
-            row = run_cell(out, train_samples, test_samples, n_rays, n_points)
+            row, entry = run_cell(out, train_samples, test_samples,
+                                  n_rays, n_points)
             rows.append(row)
+            entries.append(entry)
             print(f"  ML F1@1 {row['ml_f1@1']:.3f}   "
                   f"hough {row['hough_f1@1']:.3f}")
 
             # Rewritten every cell, so an interrupted sweep still leaves a
             # usable csv behind.
             write_csv(out_csv, rows)
-    return rows, out_csv
+    return rows, entries, out_csv
 
 
 def write_csv(path, rows):
@@ -306,7 +314,7 @@ def summarise(rows, out_csv):
     print(f"\nwrote {os.path.abspath(out_csv)}")
 
 
-def make_figures(out, rows, test_dir):
+def make_figures(out, rows, entries, test_dir):
     """
     The budget figures and example predictions, into <run>/figures/.
 
@@ -318,6 +326,9 @@ def make_figures(out, rows, test_dir):
     print("\n=== STAGE 3  figures " + "=" * 45)
     fig_budget_rays(rows, fig_dir)
     fig_budget_coverage(rows, fig_dir)
+    # One loss curve per budget plus all of them together, into
+    # <run>/loss_curves/, with models_info.json describing every model.
+    save_loss_report(out, entries)
 
     best = max(rows, key=lambda r: r["ml_f1@1"])
     ckpt = os.path.join(out, "models", grid_train.checkpoint_name(
@@ -366,9 +377,9 @@ def main():
                                          "test_dir": os.path.abspath(test_dir)})
 
     make_devices(train_dir, test_dir)
-    rows, out_csv = run_sweep(out, train_dir, test_dir)
+    rows, entries, out_csv = run_sweep(out, train_dir, test_dir)
     summarise(rows, out_csv)
-    make_figures(out, rows, test_dir)
+    make_figures(out, rows, entries, test_dir)
     if SAVE_SAMPLE_ANALYSIS:
         analyse_samples(out, rows, test_dir)
     print(f"\neverything for this trial is in {os.path.abspath(out)}")

@@ -23,6 +23,10 @@ from dqd.config import paths
 from dqd.ml import grid_dataset, grid_train, run_dir
 from dqd.ml.grid_metrics import evaluate
 
+# The loss figures are make_figures.py's own; scripts/ is on sys.path when
+# this program is run directly, so a sibling import is enough.
+from make_figures import loss_entry, save_loss_report
+
 KEYS = ("f1@0", "f1@1", "f1@2", "f1@3", "iou")
 
 
@@ -71,7 +75,7 @@ def main():
     print(f"{len(train_samples)} train devices available, sizes {sizes}")
 
     out_csv = os.path.join(out, "data_size_sweep.csv")
-    rows = []
+    rows, entries = [], []
     for n in sizes:
         print(f"\n=== {n} training devices " + "=" * 40)
         # A prefix of the sorted list, so each larger size is a superset of
@@ -80,7 +84,13 @@ def main():
         subset = train_samples[:n]
         Xtr, Ytr = grid_dataset.build_cached(subset, N_RAYS, N_POINTS,
                                              cache_dir=cache, tag=f"train{n}")
-        net, thr = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
+        net, thr, hist = grid_train.train(Xtr, Ytr, epochs=EPOCHS)
+        # Every model here shares one budget, so the label carries the one
+        # thing that differs: how many devices it saw.
+        entries.append(loss_entry(
+            hist, N_RAYS, N_POINTS, n_train=len(Xtr), epochs=EPOCHS,
+            threshold=thr, net=net, n_devices=n,
+            label=f"n{n}_rays{N_RAYS}_points{N_POINTS}"))
         m = evaluate(grid_train.predict(net, Xte) > thr, Yte)
         rows.append({"n_train": n, "n_rays": N_RAYS, "n_points": N_POINTS,
                      "threshold": thr, **{f"ml_{k}": m[k] for k in KEYS}})
@@ -90,6 +100,11 @@ def main():
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader()
             w.writerows(rows)
+
+    # One loss curve per training-set size plus all of them together, into
+    # <run>/loss_curves/, with models_info.json describing every model.
+    print("\ntraining-loss curves:")
+    save_loss_report(out, entries)
 
     print("\n" + "=" * 46)
     print(f"{N_RAYS} rays x {N_POINTS} points, varying training-set size")
