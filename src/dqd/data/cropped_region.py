@@ -161,8 +161,6 @@ class CroppedRegion:
         else:
             plt.close(fig)
 
-        print(f"Center indices: global (i={center_i}, j={center_j}), "
-              f"local (i={local_i}, j={local_j})")
         return center_i, center_j, local_i, local_j
 
     # ------------------------------------------------------------------

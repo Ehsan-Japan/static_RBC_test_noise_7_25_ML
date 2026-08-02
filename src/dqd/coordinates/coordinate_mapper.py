@@ -127,7 +127,6 @@ class CoordinateMapper:
             for i, vy in enumerate(cropped_Vy):
                 for j, vx in enumerate(cropped_Vx):
                     f.write(f"{i + 1}\t{j + 1}\t{vx}\t{vy}\n")
-        print(f"Cropped grid mapping saved to: {mapping_path}")
         return mapping_path
 
     # ------------------------------------------------------------------

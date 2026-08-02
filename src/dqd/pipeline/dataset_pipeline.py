@@ -472,7 +472,6 @@ class DatasetPipeline:
         out_path = os.path.join(sample_dir, "hyperparameters.json")
         with open(out_path, "w") as f:
             json.dump(payload, f, indent=4, default=str)
-        print(f"Hyperparameters saved: {os.path.abspath(out_path)}")
 
     # ------------------------------------------------------------------
     # Per-peak processing
@@ -498,11 +497,6 @@ class DatasetPipeline:
             vs["vy_min"], vs["vy_max"],
             vs["n_points_x"], vs["n_points_y"],
         )
-        print(
-            f"  Peak {peak_idx}: voltage=({vx:.4f}, {vy:.4f}), "
-            f"pixel=({global_pixel_x}, {global_pixel_y})"
-        )
-
         # Crop data around this peak
         cropper = CroppedRegion(peak_folder)
         results = cropper.process_batch(

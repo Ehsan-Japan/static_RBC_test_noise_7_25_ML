@@ -9,7 +9,6 @@ everything it makes inside the folder it gets back:
         config.json          exactly which settings produced this trial
         models/              one checkpoint per budget
         budget_sweep.csv
-        figures/
       20260801_1550_sweep/   the next trial, untouched by the first
         ...
 
@@ -50,7 +49,6 @@ def new_run(kind: str, settings: Optional[Dict] = None,
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(runs_root, f"{stamp}_{kind}")
     os.makedirs(os.path.join(path, "models"), exist_ok=True)
-    os.makedirs(os.path.join(path, "figures"), exist_ok=True)
     with open(os.path.join(path, "config.json"), "w") as f:
         json.dump({"kind": kind, "created": stamp, **(settings or {})},
                   f, indent=2, default=str)

@@ -7,7 +7,7 @@ Edit the SETTINGS block below and run it.  It does the whole study:
 
     STAGE 1  make the devices        (simulator)
     STAGE 2  the rays x points sweep (train + evaluate every budget)
-    STAGE 3  summary table + figures (budget_sweep.csv, figures/*.png)
+    STAGE 3  summary table + loss curves (budget_sweep.csv, loss_curves/)
     STAGE 4  full analysis of every test device (sample_<i>/ folders)
 
 The question it answers: how many rays, at what ray resolution, does it take
@@ -21,9 +21,9 @@ WHERE THINGS GO — nothing an earlier run made is ever touched.
       config.json                    every setting that produced it
       budget_sweep.csv               the results
       models/                        one checkpoint per budget
-      figures/                       for make_figures.py
       loss_curves/                   training-loss curve per model, all models
-                                     together, and models_info.json
+                                     together, and models_info.json (budget,
+                                     architecture, hyperparameters, history)
       sample_<i>/                    STAGE 4: the full per-device analysis of
                                      every test device (rays, peaks.json,
                                      summary*.png, cropped_results/, gifs/,
@@ -49,8 +49,8 @@ rather than knobs.  Only the measurement changes.
 The old separate programs still work and do exactly these stages:
 generate_ml_data.py (stage 1), train_model.py / evaluate_model.py (one cell of
 stage 2), make_figures.py (stage 3 on its own, for re-drawing an old trial).
-The figure code itself lives in make_figures.py and is imported from there —
-one copy, same plots either way.
+The loss-curve code itself lives in make_figures.py and is imported from
+there — one copy, same plots either way.
 """
 import csv
 import os
@@ -69,10 +69,9 @@ from dqd.ml.grid_metrics import evaluate
 from dqd.ml.train_test_config import describe, split_configs
 from dqd.simulation import device_factory
 
-# The figures, from the program that owns them.  scripts/ is on sys.path when
-# either program is run directly, so a sibling import is enough.
-from make_figures import (fig_budget_coverage, fig_budget_rays, fig_examples,
-                          loss_entry, save_loss_report)
+# The loss figures, from the program that owns them.  scripts/ is on sys.path
+# when either program is run directly, so a sibling import is enough.
+from make_figures import loss_entry, save_loss_report
 from render_test_sample_analysis import analyse_test_devices
 
 # ══════════════════════════════════════════════════════════════════════
@@ -85,7 +84,7 @@ from render_test_sample_analysis import analyse_test_devices
 # the order of a thousand training devices before the numbers mean anything.
 # At ~0.7 s/device, 2000 + 500 is about half an hour — paid once, then reused
 # by every later run with the same settings.
-N_TRAIN = 200
+N_TRAIN = 50
 N_TEST = 10
 
 # Stability-diagram side length in pixels.  Fixes the network's input size,
@@ -118,7 +117,7 @@ KEEP_IMAGES = False
 # len(RAYS) x len(POINTS) full trainings.  Start small, widen once the shape
 # of the curve is clear.
 RAYS = [5,6]
-POINTS = [100]
+POINTS = [30]
 
 
 # RAYS = [2, 4, 6, 8, 12]
@@ -133,12 +132,6 @@ EPOCHS =10
 # tolerant F1 on the validation split, the current behaviour).  A number,
 # e.g. 0.5, uses exactly that threshold in every cell instead.
 THRESHOLD = None
-
-# ---- STAGE 3: the figures --------------------------------------------
-
-# Test devices drawn in fig_examples.png — enough to see failure modes,
-# few enough to read.
-N_EXAMPLES = 3
 
 # ---- STAGE 4: full per-device analysis of the test devices -----------
 
@@ -299,7 +292,7 @@ def write_csv(path, rows):
 
 
 # ──────────────────────────────────────────────────────────────────────
-#  STAGE 3 — summary table and figures
+#  STAGE 3 — summary table and loss curves
 # ──────────────────────────────────────────────────────────────────────
 
 def summarise(rows, out_csv):
@@ -314,28 +307,14 @@ def summarise(rows, out_csv):
     print(f"\nwrote {os.path.abspath(out_csv)}")
 
 
-def make_figures(out, rows, entries, test_dir):
+def make_loss_report(out, entries):
     """
-    The budget figures and example predictions, into <run>/figures/.
-
-    The plotting functions are make_figures.py's own, so a figure drawn here
-    and one re-drawn later from the csv are the same figure.  Example
-    predictions use this run's best cell — the checkpoint worth looking at.
+    One loss curve per budget plus all of them together, into
+    <run>/loss_curves/, with models_info.json describing every model —
+    budget, architecture, hyperparameters, and the full training history.
     """
-    fig_dir = os.path.join(out, "figures")
-    print("\n=== STAGE 3  figures " + "=" * 45)
-    fig_budget_rays(rows, fig_dir)
-    fig_budget_coverage(rows, fig_dir)
-    # One loss curve per budget plus all of them together, into
-    # <run>/loss_curves/, with models_info.json describing every model.
+    print("\n=== STAGE 3  loss curves " + "=" * 41)
     save_loss_report(out, entries)
-
-    best = max(rows, key=lambda r: r["ml_f1@1"])
-    ckpt = os.path.join(out, "models", grid_train.checkpoint_name(
-        int(best["n_rays"]), int(best["n_points"])))
-    print(f"  examples from the best cell: {int(best['n_rays'])} rays x "
-          f"{int(best['n_points'])} points (F1@1 {best['ml_f1@1']:.3f})")
-    fig_examples(test_dir, ckpt, fig_dir, n_examples=N_EXAMPLES)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -379,7 +358,7 @@ def main():
     make_devices(train_dir, test_dir)
     rows, entries, out_csv = run_sweep(out, train_dir, test_dir)
     summarise(rows, out_csv)
-    make_figures(out, rows, entries, test_dir)
+    make_loss_report(out, entries)
     if SAVE_SAMPLE_ANALYSIS:
         analyse_samples(out, rows, test_dir)
     print(f"\neverything for this trial is in {os.path.abspath(out)}")

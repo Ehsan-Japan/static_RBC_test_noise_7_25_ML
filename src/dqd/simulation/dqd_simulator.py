@@ -165,8 +165,6 @@ class DQDSimulator:
 
         save_figure(fig, cs_save, dpi=dpi)
 
-        print(f"Charge sensing data saved: {npy_z}")
-
     # ------------------------------------------------------------------
     # Double-dot stability diagram (from old preprocessing.py)
     # ------------------------------------------------------------------
@@ -219,4 +217,3 @@ class DQDSimulator:
 
         dd_array = np.stack((xv.flatten(), yv.flatten(), z_full.flatten().astype(int)), axis=-1)
         np.save(os.path.join(out_dir, "double_dot_data.npy"), dd_array)
-        print(f"Double dot data saved: {os.path.join(out_dir, 'double_dot_data.npy')}")

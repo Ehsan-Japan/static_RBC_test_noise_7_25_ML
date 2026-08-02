@@ -53,6 +53,28 @@ VAL_FRACTION = 0.15      # of the TRAINING devices, never of the test set
 SEED = 0
 
 
+def training_description() -> Dict:
+    """
+    The training hyperparameters as a record for models_info.json.  These are
+    the constants above — identical in every cell of a sweep — written out so
+    a run folder explains, on its own, how its models were trained.
+    """
+    return {
+        "optimizer": "Adam",
+        "learning_rate": LEARNING_RATE,
+        "batch_size": BATCH_SIZE,
+        "val_fraction": VAL_FRACTION,
+        "seed": SEED,
+        "loss": ("BCEWithLogits (positive class weighted by its rarity, "
+                 f"capped at {MAX_POS_WEIGHT}) + soft Dice"),
+        "max_pos_weight": MAX_POS_WEIGHT,
+        "threshold_scan": list(THRESHOLDS),
+        "model_selection": ("epoch with best validation F1@1; binarisation "
+                            "threshold picked on the validation split, "
+                            "carved out of the training set"),
+    }
+
+
 def checkpoint_name(n_rays: int, n_points: int) -> str:
     """One canonical filename per budget, so the scripts always agree."""
     return f"rays{n_rays}_points{n_points}.pt"

@@ -43,7 +43,10 @@ def _block(cin: int, cout: int) -> nn.Sequential:
 class RayToLinesNet(nn.Module):
     def __init__(self, in_channels: int = 2, depth: int = 3):
         super().__init__()
+        self.in_channels = in_channels
+        self.depth = depth
         widths = [WIDTH * 2 ** i for i in range(depth + 1)]      # 32,64,128,256
+        self.widths = widths
 
         self.down = nn.ModuleList()
         cin = in_channels
@@ -74,3 +77,31 @@ class RayToLinesNet(nn.Module):
     @property
     def n_params(self) -> int:
         return sum(p.numel() for p in self.parameters())
+
+    def describe(self) -> dict:
+        """
+        Human-readable record of the architecture, for models_info.json —
+        so a run folder explains, on its own, what network produced it.
+        """
+        return {
+            "class": type(self).__name__,
+            "architecture": ("fully convolutional U-Net (encoder-decoder "
+                             "with skip connections); no flatten or "
+                             "fixed-size layer, so any H x W works"),
+            "input": (f"(batch, {self.in_channels}, H, W) — ch0 raw sensor "
+                      "signal along the rays, ch1 visited mask"),
+            "output": ("(batch, H, W) per-pixel transition-line logit "
+                       "(sigmoid -> probability)"),
+            "in_channels": self.in_channels,
+            "depth": self.depth,
+            "base_width": WIDTH,
+            "encoder_widths": self.widths[:-1],
+            "bottleneck_width": self.widths[-1],
+            "decoder_widths": list(reversed(self.widths[:-1])),
+            "block": "2 x (3x3 Conv -> BatchNorm2d -> GELU) per stage",
+            "downsampling": "2x2 max-pool between encoder stages",
+            "upsampling": ("nearest-neighbour resize to the skip tensor's "
+                           "size, then channel-concat with the skip"),
+            "head": "1x1 conv -> 1 logit per pixel",
+            "n_params": self.n_params,
+        }

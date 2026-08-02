@@ -104,8 +104,6 @@ class Sample:
         if os.path.isdir(stale):
             shutil.rmtree(stale)
 
-        print("Sample organisation complete.")
-
     # ------------------------------------------------------------------
     # Image management (from old data_processing.manage_images)
     # ------------------------------------------------------------------

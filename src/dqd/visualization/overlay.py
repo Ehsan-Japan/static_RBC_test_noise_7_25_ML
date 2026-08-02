@@ -111,10 +111,6 @@ class OverlayRenderer:
         scanned_cells, peaks = OverlayRenderer.parse_voltage_coordinates(
             voltage_coords_file
         )
-        print(
-            f"Parsed {len(scanned_cells)} scanned cells and {len(peaks)} peaks "
-            f"from {voltage_coords_file}"
-        )
 
         fig, ax, cax = new_map_figure(with_colorbar=True)
         im = ax.imshow(
@@ -143,7 +139,6 @@ class OverlayRenderer:
             label="Current (nA)" if is_double_dot else "Sensor Signal",
         )
         save_figure(fig, output_file)
-        print(f"Highlighted charge-sensor image saved to: {output_file}")
 
     # ------------------------------------------------------------------
     # All-rays overlay  (from old plot_overlay.py)
@@ -211,7 +206,6 @@ class OverlayRenderer:
         fig.colorbar(im, cax=cax, label=cbar_label)
         ax.legend(loc="upper right")
         save_figure(fig, output_file)
-        print(f"[All Rays Overlay] Saved combined plot to: {output_file}")
 
     # ------------------------------------------------------------------
     # All-scanned + all-peaks overlay with row/col txt  (utility6.py)
@@ -256,10 +250,6 @@ class OverlayRenderer:
 
         num_scanned = len(all_scanned)
         num_peaks = len(all_peaks)
-        print(
-            f"[highlight_all_scanned_and_peaks_in_sample] Found "
-            f"{num_scanned} scanned cells and {num_peaks} peaks in {sample_dir}."
-        )
 
         npy_path = os.path.join(
             sample_dir, "numpy", "simulation", charge_sensing_filename
@@ -303,9 +293,6 @@ class OverlayRenderer:
         ax.legend(loc="upper right")
         fig.colorbar(im, cax=cax, label=cbar_label)
         save_figure(fig, output_file)
-        print(
-            f"[highlight_all_scanned_and_peaks_in_sample] Saved overlay to: {output_file}"
-        )
 
         # Write summary txt with row/col
         def _v_to_rc(vx, vy):
@@ -328,9 +315,6 @@ class OverlayRenderer:
             for vx, vy in all_peaks:
                 r, c = _v_to_rc(vx, vy)
                 f.write(f"V=({vx}, {vy}), row={r}, col={c}\n")
-        print(
-            f"[highlight_all_scanned_and_peaks_in_sample] Summary saved to: {txt_path}"
-        )
 
     # ------------------------------------------------------------------
     # Binary-mode all-scanned overlay (utility4.py)
@@ -367,10 +351,6 @@ class OverlayRenderer:
 
         num_scanned = len(all_scanned)
         num_peaks = len(all_peaks)
-        print(
-            f"[highlight_all_scanned_and_peaks_in_sample_in_binary] Found "
-            f"{num_scanned} scanned cells and {num_peaks} peaks in {sample_dir}."
-        )
 
         output_dir = os.path.dirname(output_file)
         base_name = os.path.splitext(os.path.basename(output_file))[0]
@@ -391,9 +371,6 @@ class OverlayRenderer:
                     f.write(f"({vx}, {vy})\n")
             else:
                 f.write("None\n")
-        print(
-            f"[highlight_all_scanned_and_peaks_in_sample_in_binary] Summary saved to: {txt_path}"
-        )
 
     # ------------------------------------------------------------------
     # Ground-truth binary array  (utility4.py)
@@ -458,7 +435,6 @@ class OverlayRenderer:
             binary_array = np.logical_or(vertical, horizontal).astype(np.uint8)
 
         np.save(output_npy_path, binary_array)
-        print(f"Ground truth array saved to: {output_npy_path}")
         return binary_array
 
     # ------------------------------------------------------------------
@@ -662,7 +638,6 @@ class OverlayRenderer:
                   loc="upper right", fontsize=legend_fontsize)
 
         save_figure(fig, output_file)
-        print(f"[summary_total] Saved to: {output_file}")
 
     # ------------------------------------------------------------------
     # Private helpers

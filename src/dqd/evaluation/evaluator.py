@@ -187,8 +187,6 @@ class SampleEvaluator:
             f.write(f"  Scanned Cells  : {n_scanned} (out of {total_cells})\n")
             f.write(f"  Grid Coverage  : {coverage:.2f}%\n")
 
-        print(f"[Evaluator] evaluation.txt saved to {out_path}")
-
     # ------------------------------------------------------------------
     # skipped_peaks.txt
     # ------------------------------------------------------------------
@@ -254,5 +252,3 @@ class SampleEvaluator:
         out_path = os.path.join(self.sample_dir, "skipped_peaks.txt")
         with open(out_path, "w") as f:
             f.writelines(lines)
-
-        print(f"[Evaluator] skipped_peaks.txt saved to {out_path}")

@@ -9,8 +9,6 @@ and checkpoints that produced them.
 
 Writes into <run folder>/figures/ :
 
-    fig_budget_rays.png       F1 vs number of rays, one line per ray resolution
-    fig_budget_coverage.png   F1 vs how much of the diagram was measured
     fig_data_size.png         F1 vs training-set size (the learning curve)
     fig_examples.png          what the model actually draws, on test devices
 
@@ -98,89 +96,7 @@ def _num(v):
 
 
 # ----------------------------------------------------------------------
-# Figure 1: F1 vs number of rays, one line per ray resolution
-# ----------------------------------------------------------------------
-
-def fig_budget_rays(rows, fig_dir):
-    resolutions = sorted({int(r["n_points"]) for r in rows})
-    if len(resolutions) > len(SERIES):
-        # Three is the validated series cap for this palette; more than that
-        # and adjacent resolutions stop being separable for CVD readers.
-        print(f"  [note] {len(resolutions)} ray resolutions, plotting the "
-              f"{len(SERIES)} extremes + middle")
-        resolutions = [resolutions[0],
-                       resolutions[len(resolutions) // 2],
-                       resolutions[-1]]
-
-    fig, ax = plt.subplots(figsize=(6.0, 4.2))
-    _style(ax, "number of rays", "transition-line F1  (tolerance 1 px)",
-           "Line recovery improves with more rays")
-
-    for color, P in zip(SERIES, resolutions):
-        sub = sorted((r for r in rows if int(r["n_points"]) == P),
-                     key=lambda r: r["n_rays"])
-        x = [r["n_rays"] for r in sub]
-        y = [r["ml_f1@1"] for r in sub]
-        ax.plot(x, y, "-o", color=color, linewidth=2, markersize=5,
-                markeredgecolor=SURFACE, markeredgewidth=1.2,
-                label=f"{P} points/ray", zorder=3)
-        # Direct label at the line end, in ink — the legend gives identity,
-        # this makes the ordering readable without crossing back to it.
-        if x:
-            ax.annotate(f"{P} pts", (x[-1], y[-1]), textcoords="offset points",
-                        xytext=(6, 0), va="center", fontsize=8, color=INK_2)
-
-        base = [r.get("hough_f1@1") for r in sub]
-        if P == resolutions[-1] and all(b is not None for b in base):
-            ax.plot(x, base, "--", color=BASELINE, linewidth=1.6, zorder=2,
-                    label=f"Hough baseline ({P} points/ray)")
-
-    ax.set_ylim(0, 1)
-    # Upper left: the curves rise to the right, so a lower-right legend sits
-    # exactly where the interesting part of the data ends up.
-    ax.legend(frameon=False, fontsize=9, labelcolor=INK_2, loc="upper left")
-    _save(fig, "fig_budget_rays.png", fig_dir)
-
-
-# ----------------------------------------------------------------------
-# Figure 2: F1 vs measured coverage — the true cost axis
-# ----------------------------------------------------------------------
-
-def fig_budget_coverage(rows, fig_dir):
-    """
-    Rays and points both cost measurement time; coverage is what they buy.
-    Plotting against coverage collapses the two knobs into the quantity an
-    experimentalist actually pays for, and shows whether two different
-    (rays, points) combinations that cost the same also score the same.
-    """
-    fig, ax = plt.subplots(figsize=(6.0, 4.2))
-    _style(ax, "fraction of the diagram measured  (%)",
-           "transition-line F1  (tolerance 1 px)",
-           "What the measurement budget buys")
-
-    srt = sorted(rows, key=lambda r: r["coverage"])
-    x = [100 * r["coverage"] for r in srt]
-    ax.plot(x, [r["ml_f1@1"] for r in srt], "o", color=SERIES[0],
-            markersize=7, markeredgecolor=SURFACE, markeredgewidth=1.2,
-            label="learned model", zorder=3)
-    if all("hough_f1@1" in r for r in srt):
-        ax.plot(x, [r["hough_f1@1"] for r in srt], "s", color=BASELINE,
-                markersize=6, markeredgecolor=SURFACE, markeredgewidth=1.2,
-                label="Hough baseline", zorder=2)
-
-    for r in srt:
-        ax.annotate(f"{int(r['n_rays'])}x{int(r['n_points'])}",
-                    (100 * r["coverage"], r["ml_f1@1"]),
-                    textcoords="offset points", xytext=(0, 8),
-                    ha="center", fontsize=7, color=INK_2)
-
-    ax.set_ylim(0, 1)
-    ax.legend(frameon=False, fontsize=9, labelcolor=INK_2, loc="lower right")
-    _save(fig, "fig_budget_coverage.png", fig_dir)
-
-
-# ----------------------------------------------------------------------
-# Figure 3: learning curve
+# Figure: learning curve
 # ----------------------------------------------------------------------
 
 def fig_data_size(rows, fig_dir):
@@ -295,8 +211,12 @@ def loss_entry(history, n_rays, n_points, n_train, epochs, threshold,
          "best_val_f1": float(max(history["val_f1"])),
          "history": {k: [float(v) for v in vs] for k, vs in history.items()},
          **extra}
+    # What the model IS — architecture and training hyperparameters — so the
+    # json explains itself without anyone opening src/dqd/ml/.
+    e["training"] = grid_train.training_description()
     if net is not None:
         e["n_params"] = int(net.n_params)
+        e["model"] = net.describe()
     return e
 
 
@@ -409,14 +329,6 @@ def main():
     if model:
         print(f"checkpoint:    {os.path.abspath(model)}")
     print(f"figures -> {os.path.abspath(fig_dir)}\n")
-
-    print("budget sweep figures:")
-    rows = _read_csv(budget_csv) if budget_csv else None
-    if rows:
-        fig_budget_rays(rows, fig_dir)
-        fig_budget_coverage(rows, fig_dir)
-    elif not budget_csv:
-        print("  [skip] no budget_sweep.csv in runs/")
 
     print("data-size figure:")
     rows = _read_csv(size_csv) if size_csv else None
