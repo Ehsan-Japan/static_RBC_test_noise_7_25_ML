@@ -82,8 +82,8 @@ from render_test_sample_analysis import analyse_test_devices
 # the order of a thousand training devices before the numbers mean anything.
 # At ~0.7 s/device, 2000 + 500 is about half an hour — paid once, then reused
 # by every later run with the same settings.
-N_TRAIN = 60
-N_TEST = 5
+N_TRAIN = 200
+N_TEST = 10
 
 # Stability-diagram side length in pixels.  Fixes the network's input size,
 # so every device in one study must share it.
@@ -114,8 +114,8 @@ KEEP_IMAGES = False
 # Every combination of these is trained and scored, so this is
 # len(RAYS) x len(POINTS) full trainings.  Start small, widen once the shape
 # of the curve is clear.
-RAYS = [10]
-POINTS = [70]
+RAYS = [5,6,7,8]
+POINTS = [100]
 
 
 # RAYS = [2, 4, 6, 8, 12]
@@ -123,7 +123,7 @@ POINTS = [70]
 
 
 # Fewer epochs than train_model.py, because this runs many times over.
-EPOCHS = 30
+EPOCHS = 40
 
 # Probability threshold that turns the model's per-pixel probabilities into
 # the binary line map.  None = pick automatically (the value maximising

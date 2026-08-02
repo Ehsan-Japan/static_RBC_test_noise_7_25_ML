@@ -178,6 +178,35 @@ def render_sample(sdir, tag, fig_dir, net=None, thr=None,
             f"{tag}_overlay.png", fig_dir)
 
 
+def render_binary_panels(sdir, tag, fig_dir, pred, label):
+    """
+    Prediction + overlay panels for ANY binary line map — used for the Hough
+    baseline, whose prediction is a map like the network's but comes from no
+    checkpoint.  Same house style, same two panels as ml_prediction.png /
+    ml_overlay.png, so the pair can be compared side by side.
+    """
+    ux, uy, _ = load_grid(sdir)
+    Y = load_ground_truth(sdir)
+    x_edges, y_edges = _edges(ux, uy)
+    truth_patch = Patch(facecolor="black", edgecolor="black",
+                        label=LABEL_TRUTH)
+
+    fig, ax, _ = new_map_figure()
+    draw_ground_truth_map(ax, x_edges, y_edges, pred.astype(float))
+    pred_patch = Patch(facecolor="black", edgecolor="black", label=label)
+    _finish(fig, ax, ux, uy, [pred_patch], f"{tag}_prediction.png", fig_dir)
+
+    fig, ax, _ = new_map_figure()
+    draw_ground_truth_map(ax, x_edges, y_edges, Y)
+    px, py = _mask_centers(pred, x_edges, y_edges)
+    ax.scatter(px, py, zorder=5, **MARKER_PEAK)
+    pred_x_handle = Line2D([], [], linestyle="none", marker="x",
+                           color="red", markersize=8, markeredgewidth=1.5,
+                           label=label)
+    _finish(fig, ax, ux, uy, [truth_patch, pred_x_handle],
+            f"{tag}_overlay.png", fig_dir)
+
+
 def main():
     if not os.path.isdir(DATASET_DIR):
         sys.exit(f"no dataset at {os.path.abspath(DATASET_DIR)}\n"

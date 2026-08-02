@@ -36,3 +36,25 @@ def training_data(*parts: str) -> str:
         training_data("ml_train_split_n2000_res100")
     """
     return os.path.join(TRAINING_DATA, *parts)
+
+# This is a convenience function. 
+# The *parts syntax allows you to pass in as many string arguments as you want.
+# The function will take the absolute path of your TRAINING_DATA folder and glue all those pieces onto the end of it.
+
+
+
+# PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+#     os.path.dirname(os.path.abspath(__file__)))))
+# This block calculates the exact location of your main project folder.
+
+# os.path.abspath(__file__): Gets the full, absolute path to this file. (e.g., /Users/name/static_RBC_test_noise_7_25_ML/src/dqd/config/paths.py)
+
+# os.path.dirname(...): Strips off the last piece of the path to get the parent folder. Because paths.py is buried 4 folders deep inside the project root, the code calls dirname 4 times to climb up:
+
+# Up to config/
+
+# Up to dqd/
+
+# Up to src/
+
+# Up to static_RBC_test_noise_7_25_ML/ (This becomes PROJECT_ROOT)

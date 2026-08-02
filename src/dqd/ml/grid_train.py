@@ -102,9 +102,15 @@ def best_threshold(prob: np.ndarray, Y: np.ndarray, tau: float = 1.0):
 
 
 def train(X: np.ndarray, Y: np.ndarray, epochs: int = 40,
-          verbose: bool = True) -> Tuple[RayToLinesNet, float]:
+          verbose: bool = True) -> Tuple[RayToLinesNet, float, Dict]:
     """
-    Fit the network on ONE budget's (X, Y) and return (net, threshold).
+    Fit the network on ONE budget's (X, Y) and return
+    (net, threshold, history).
+
+    history holds one value per epoch — {"train_loss": [...], "val_f1": [...]}
+    — exactly the numbers printed during training, so the loss curves of
+    different budgets can be compared after the fact (make_figures.py's
+    save_loss_report).
 
     Test data never enters this function.  The validation slice used to pick
     the epoch and the threshold is carved out of the training set, so the
@@ -136,6 +142,7 @@ def train(X: np.ndarray, Y: np.ndarray, epochs: int = 40,
         print(f"  {net.n_params/1e3:.0f}k params, "
               f"{len(Xt)} train / {len(Xv)} val, positives {100*pos:.2f}%")
 
+    history = {"train_loss": [], "val_f1": []}
     best_f1, best_state = -1.0, None
     for ep in range(1, epochs + 1):
         net.train()
@@ -149,6 +156,8 @@ def train(X: np.ndarray, Y: np.ndarray, epochs: int = 40,
             opt.step()
             tot += float(loss.detach()) * len(sl)
         _, f1 = best_threshold(predict(net, Xv), Yv)
+        history["train_loss"].append(tot / len(Xt))
+        history["val_f1"].append(float(f1))
         if verbose:
             print(f"  epoch {ep:3d}  loss {tot/len(Xt):.4f}  val F1@1 {f1:.3f}")
         if f1 > best_f1:
@@ -166,7 +175,7 @@ def train(X: np.ndarray, Y: np.ndarray, epochs: int = 40,
         print(f"  WARNING: model predicts {100*frac:.1f}% of pixels as lines "
               f"(truth is {100*pos:.1f}%) — it has collapsed to a constant "
               f"and is ignoring its input.  More devices or more epochs.")
-    return net, thr
+    return net, thr, history
 
 
 def save(net, threshold: float, path: str, n_rays: int, n_points: int,
